@@ -967,6 +967,13 @@ class App {
           const r = await backend.invoke('project.createRepository', { name: name.value.trim() });
           notify(r.message || `${r.repository}: pushed${r.playground ? ', and on jumphp.net' : ''}.`, r.message ? 'warning' : 'success',
             { title: 'GitHub', timeout: 0, actions: [{ label: 'Open the repository', action: () => this.openUrl(r.url) }, { label: 'Reload the project', action: () => location.reload() }] });
+        } catch (e) {
+          // GitHub refused the token jumphp.net kept (revoked / expired): sign in again, then the same dialog
+          if (/bad credentials|refuses the saved token|refused the token saved/i.test(e.message)) {
+            notify(e.message, 'error', { title: 'GitHub', timeout: 0, actions: [{ label: 'Sign in again', action: () => backend.invoke('session.login', { another: false })
+              .then(() => { notify('Signed in again.', 'success', { title: 'GitHub' }); this.createRepository(); })
+              .catch((err) => !/cancel/i.test(err.message) && notify(err.message, 'error', { title: 'Sign in' })) }] });
+          } else notify(e.message, 'error', { title: 'GitHub' });
         } finally { done(); }
       } }],
     });

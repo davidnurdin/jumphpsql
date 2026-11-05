@@ -60,6 +60,20 @@ commits.
   qu'une modification remplace est marqué avant (orange) et ce qu'il a écrit après (vert), ses commandes apparaissent
   dans Run avec leur sortie, ses recherches dans Find, son plan au-dessus de la conversation ; le clavier reste dans la
   fenêtre Claude et rien ne bouge pendant que vous tapez.
+- **Claude : modes et autorisations** : un sélecteur (et `Maj+Tab` dans la zone de saisie) choisit ce que Claude peut faire :
+  mode auto, modifier les fichiers, plan seulement, demander, tout automatique ; le changement garde la conversation
+  (`--resume`). Quand Claude demande une autorisation, la fenêtre propose : une fois, 5 min, 15 min, 1 h, la session ou
+  toujours, pour ce genre de commande ou pour tout (⚙ > *Forget the permissions given* efface tout). Quand le contexte est
+  plein à 80 %, l'IDE envoie `/compact` ; les jauges Context / 5 h / Semaine bougent en temps réel. Avec **OpenCode**, ses
+  permissions suivent le mode (il ne peut pas demander : sans cela il refuse les outils MCP).
+- **Historique des IA (`IA/HISTORY`)** : chaque tour de Claude ou d'OpenCode est écrit à la racine du projet,
+  `IA/HISTORY/<CLAUDE|OPEN CODE>/<modèle>/<jj-mm-aaaa HH-MM-SS>/<demande>.md` (la demande, les outils, la réponse). `IA/` est
+  ajouté au `.gitignore` : **ce dossier n'est jamais envoyé à git** et reste sur cet ordinateur, donc perdu avec lui. Hors de
+  l'IDE, `AGENTS.md` (règle 12) demande la même chose aux IA.
+- **Programmes manquants** : quand git, Docker, Claude Code ou OpenCode ne sont pas installés, la notification d'erreur a un
+  bouton **Install** (winget sous Windows, Homebrew sous macOS, le gestionnaire de paquets avec pkexec sous Linux, sinon la
+  page de téléchargement). Créer le dépôt GitHub : si GitHub refuse le jeton (« Bad credentials »), un bouton **Sign in
+  again** relance la connexion puis la création.
 - **Claude : onglets, fenêtres, historique** : un onglet par conversation ; `+` en démarre une autre sans arrêter les
   autres (chacune son processus Claude Code). Clic droit sur un onglet : **Open in a Window** (la conversation continue
   dans sa propre fenêtre ; fermer cette fenêtre la remet en onglet), renommer, copier en Markdown, fermer. Chaque

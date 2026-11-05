@@ -3,8 +3,10 @@ project:
   id: jumphpsql              # lower case, unique: also the app's data folder
   title: "jumphpsql"
   version: 0.1.0
-  description: "jumphpsql"
-  descriptions: {}
+  description: "A MySQL / MariaDB client: browse databases and tables, edit rows, run SQL, make SQL dumps."
+  descriptions:
+    fr: "Un client MySQL / MariaDB : parcourir les bases et les tables, éditer les lignes, exécuter du SQL, faire des dumps SQL."
+    en: "A MySQL / MariaDB client: browse databases and tables, edit rows, run SQL, make SQL dumps."
   kind: gui                     # the IDE opens its forms/*.form.yaml in the visual editor
   view: window                  # the view is the window, pixel for pixel: the forms lay themselves out in it
   width: 1024                   # the window's first size (dp)
@@ -14,6 +16,7 @@ project:
   start_scene: App\Form\MainForm
   lang: en
   touch: false                  # no game pad on phones: the forms are touched directly
+  ssh: true                     # bin/jumphp run gives it your ssh-agent and ~/.ssh (read only): SSH tunnels
   pause_on_blur: false
   mute_when_hidden: true
   smoke:

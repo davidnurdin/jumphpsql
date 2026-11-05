@@ -1,0 +1,120 @@
+# A connection's settings (a dialog over the main window): src/Form/ConnectionForm.php.
+form:
+  title: Connection
+  dialog: true
+  width: 880
+  padding: 18
+  gap: 8
+  children:
+    - {type: label, id: heading, text: 'New connection', style: title}
+    - type: grid
+      gap: 18
+      children:
+        - type: column
+          id: mysqlBox
+          gap: 8
+          span: {xs: 12, md: 6}
+          children:
+            - {type: label, text: Name}
+            - {type: textbox, id: name, placeholder: 'My server'}
+            - type: row
+              gap: 8
+              children:
+                - type: column
+                  gap: 4
+                  grow: 1
+                  children:
+                    - {type: label, id: hostLabel, text: Host}
+                    - {type: textbox, id: host, placeholder: 127.0.0.1}
+                - type: column
+                  gap: 4
+                  width: 100
+                  children:
+                    - {type: label, text: Port}
+                    - {type: textbox, id: port, placeholder: '3306', maxLength: 5}
+            - type: row
+              gap: 8
+              children:
+                - type: column
+                  gap: 4
+                  grow: 1
+                  children:
+                    - {type: label, text: User}
+                    - {type: textbox, id: user, placeholder: root}
+                - type: column
+                  gap: 4
+                  grow: 1
+                  children:
+                    - {type: label, text: Password}
+                    - {type: textbox, id: password, password: true}
+            - {type: checkbox, id: savePassword, text: 'Save the password (in the app''s data folder, not encrypted)', checked: true}
+            - {type: label, text: 'Default database (optional)'}
+            - {type: textbox, id: database, placeholder: 'shop'}
+        - type: column
+          id: sshBox
+          gap: 8
+          span: {xs: 12, md: 6}
+          children:
+            - {type: checkbox, id: useSsh, text: 'Through an SSH tunnel', events: {change: onUseSshChange}}
+            - type: panel
+              id: sshPanel
+              title: SSH
+              visible: false
+              gap: 6
+              children:
+                - type: row
+                  gap: 8
+                  children:
+                    - type: column
+                      gap: 4
+                      grow: 1
+                      children:
+                        - {type: label, text: 'SSH host'}
+                        - {type: textbox, id: sshHost, placeholder: bastion.example.com}
+                    - type: column
+                      gap: 4
+                      width: 100
+                      children:
+                        - {type: label, text: Port}
+                        - {type: textbox, id: sshPort, placeholder: '22', maxLength: 5}
+                - type: row
+                  gap: 8
+                  children:
+                    - type: column
+                      gap: 4
+                      grow: 1
+                      children:
+                        - {type: label, text: 'SSH user'}
+                        - {type: textbox, id: sshUser, placeholder: 'your login'}
+                    - type: column
+                      gap: 4
+                      grow: 1
+                      children:
+                        - {type: label, text: Authentication}
+                        - {type: combobox, id: sshAuth, items: ['Session key (ssh-agent)', 'Key file', 'Password', 'SSH config / default keys'], selected: 0, events: {change: onSshAuthChange}}
+                - type: column
+                  id: sshKeyBox
+                  gap: 4
+                  visible: false
+                  children:
+                    - {type: label, text: 'Private key file'}
+                    - {type: textbox, id: sshKey, placeholder: '~/.ssh/id_ed25519'}
+                    - {type: label, text: 'Passphrase (if the key has one)'}
+                    - {type: textbox, id: sshPassphrase, password: true}
+                - type: column
+                  id: sshPasswordBox
+                  gap: 4
+                  visible: false
+                  children:
+                    - {type: label, text: 'SSH password'}
+                    - {type: textbox, id: sshPassword, password: true}
+                - {type: label, id: sshHint, text: '', style: muted}
+    - {type: label, id: result, text: '', style: muted}
+    - type: row
+      gap: 6
+      children:
+        - {type: button, id: test, text: Test, events: {click: onTestClick}}
+        - {type: button, id: delete, text: Delete, style: danger, visible: false, events: {click: onDeleteClick}}
+        - {type: spacer}
+        - {type: button, id: cancel, text: Cancel, style: flat, events: {click: onCancelClick}}
+        - {type: button, id: save, text: Save, style: primary, default: true, events: {click: onSaveClick}}

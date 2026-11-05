@@ -107,7 +107,8 @@ class OpenGl extends EventEmitter
         $r = $this->sdl->getRenderer();
         $this->sdlSwapsRedBlue();        // measured with SDL calls: before the state is saved
         $this->save();
-        $t = $this->target($r->getWidth() * $this->supersample, $r->getHeight() * $this->supersample);
+        [$vw, $vh] = $r->viewPixels();   // the view texture's pixels (bigger than the view in HD)
+        $t = $this->target($vw * $this->supersample, $vh * $this->supersample);
         glBindFramebuffer(GL_FRAMEBUFFER, $t['fb']);
         glViewport(0, 0, $t['w'], $t['h']);
         if ($clear !== null) {
@@ -128,9 +129,9 @@ class OpenGl extends EventEmitter
             return;
         }
         // into the scene's target: the view texture (SDL sets its viewport lazily: never trust the current one)
-        $r = $this->sdl->getRenderer();
+        [$vw, $vh] = $this->sdl->getRenderer()->viewPixels();
         glBindFramebuffer(GL_FRAMEBUFFER, $this->saved['fb']);
-        glViewport(0, 0, $r->getWidth(), $r->getHeight());
+        glViewport(0, 0, $vw, $vh);
         $this->blit($this->target['tex'], true, true);
         $this->restore();
     }
@@ -281,7 +282,20 @@ class OpenGl extends EventEmitter
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, $id);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        // desktop GL: SDL leaves the row length of its last texture upload set; ours are tightly packed (without
+        // this, a texture made after SDL updated one of its own is read with the wrong rows). WebGL 1 and the phone
+        // apps' OpenGL ES 2 have no row length.
+        $unpack = [];
+        if (!\JumPHP\Kernel\Platform::isWasm() && !\JumPHP\Kernel\Platform::isPhoneApp()) {
+            foreach ([GL_UNPACK_ROW_LENGTH, GL_UNPACK_SKIP_ROWS, GL_UNPACK_SKIP_PIXELS] as $param) {
+                $unpack[$param] = (int)glGetIntegerv($param);
+                glPixelStorei($param, 0);
+            }
+        }
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, $width, $height, 0, GL_RGBA, GL_UNSIGNED_BYTE, $rgba);
+        foreach ($unpack as $param => $value) {
+            glPixelStorei($param, $value);
+        }
         // WebGL 1 repeats power-of-two textures only
         $pot = ($width & ($width - 1)) === 0 && ($height & ($height - 1)) === 0;
         $this->params($smooth, $repeat && $pot);

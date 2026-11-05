@@ -1,0 +1,38 @@
+# Dump a database to a .sql file, or import a .sql file into it (a dialog): src/Form/TransferForm.php.
+form:
+  title: Dump
+  dialog: true
+  width: 520
+  padding: 18
+  gap: 8
+  children:
+    - {type: label, id: heading, text: 'Dump', style: title}
+    - {type: label, id: subject, text: '', style: muted}
+    - {type: label, text: File}
+    - type: row
+      gap: 6
+      children:
+        - {type: textbox, id: path, grow: 1}
+        - {type: button, id: browse, text: 'Browse…', visible: false, events: {click: onBrowseClick}}
+    - type: column
+      id: dumpOptions
+      gap: 6
+      children:
+        - {type: checkbox, id: structure, text: 'Structure (CREATE TABLE / VIEW)', checked: true}
+        - {type: checkbox, id: data, text: 'Data (INSERT)', checked: true}
+        - {type: checkbox, id: drop, text: 'DROP before each CREATE', checked: true}
+        - {type: checkbox, id: createDatabase, text: 'CREATE DATABASE and USE', checked: false}
+    - type: column
+      id: importOptions
+      gap: 6
+      visible: false
+      children:
+        - {type: checkbox, id: continueOnError, text: 'Go on after an error', checked: false}
+    - {type: progressbar, id: progress, value: 0, max: 100, showText: true}
+    - {type: label, id: message, text: '', style: muted}
+    - type: row
+      gap: 6
+      children:
+        - {type: spacer}
+        - {type: button, id: cancel, text: Close, style: flat, events: {click: onCancelClick}}
+        - {type: button, id: start, text: Start, style: primary, default: true, events: {click: onStartClick}}

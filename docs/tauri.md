@@ -608,7 +608,7 @@ A PHP *fatal* error (not an exception) during a frame cannot be caught: it ends 
 
 | | Linux x86_64 | Windows x86_64 | macOS (Apple silicon + Intel) |
 |---|---|---|---|
-| WebView | WebKitGTK 4.1 | WebView2 (Edge) | WKWebView |
+| WebView | WebKitGTK 4.1 | WebView2 (Edge; the library packs Microsoft's bootstrapper and installs it silently when it is missing, e.g. a fresh Windows 10) | WKWebView |
 | runtime library | `libjumphp_tauri.so` | `jumphp_tauri.dll` | `libjumphp_tauri.dylib` (universal) |
 | built and tried by | `tauri:build` here, and the workflow | the workflow | the workflow |
 | `app:run` / `app:test` / `app:shot` | yes (Docker) | — (run `php app.php` with PHP's FFI) | — (same) |

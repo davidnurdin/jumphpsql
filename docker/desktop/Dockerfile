@@ -61,6 +61,14 @@ RUN set -eux; \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# the system's ssh client: apps that open SSH tunnels (ssh -L) through it, with the user's agent and ~/.ssh
+# (bin/jumphp run mounts them); libnss-wrapper: ssh wants the user in /etc/passwd, which the uid given by --user is not.
+# Last, so that adding it kept the layers above.
+RUN apt-get update && apt-get install -y --no-install-recommends openssh-client libnss-wrapper \
+    && rm -rf /var/lib/apt/lists/*
+# bumped when the image changes: bin/jumphp builds it again when its label is older
+LABEL org.jumphp.desktop.rev="2"
+
 # same limits as the browser build would hit first: keep the desktop honest
 RUN { echo 'memory_limit=512M'; echo 'error_reporting=E_ALL'; echo 'display_errors=stderr'; } \
         > /usr/local/etc/php/conf.d/zz-jumphp.ini

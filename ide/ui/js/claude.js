@@ -11,6 +11,7 @@ import { el, clear, icon, menu, notify, prefs, prompt, confirm, copyText, deboun
 import { AgentTools, ClaudeWatch, IDE_TOOL, ideToolLabel } from './agent.js';
 
 const MODES = {
+  auto: ['Auto mode', 'Claude works on its own: a safety check approves the safe actions and refuses the risky ones'],
   acceptEdits: ['Edit files', 'Claude changes files without asking; commands it may not run are refused'],
   plan: ['Plan only', 'Claude reads and proposes, changes nothing'],
   default: ['Ask (refuse what needs a yes)', 'Claude can only do what needs no permission'],
@@ -48,6 +49,10 @@ export class ClaudePanel {
     this.opencodeModel = prefs.get('opencodeModel', '');
     this.opencodeModels = [];
     this.status = el('span.claude-status');
+    if (!MODES[this.mode]) this.mode = 'acceptEdits';
+    this.modeSelect = el('select.input.small.claude-select', { title: 'What Claude may do (Shift+Tab in the box: next mode)', onchange: () => this.setMode(this.modeSelect.value) },
+      ...Object.entries(MODES).map(([id, [label]]) => el('option', { value: id }, label)));
+    this.modeSelect.value = this.mode;
     // Follow (the editors show what Claude does) and the IDE's tools for Claude: the main window's (a conversation in a
     // window of its own has no editors)
     this.watch = detached ? { on: false, use() {}, result() {}, done() {}, toggle() {}, marks: { clearAll() {} } } : new ClaudeWatch(app, this);
@@ -66,7 +71,7 @@ export class ClaudePanel {
     this.body = el('div.claude-body');
     this.usage = new UsageGauges();
     this.node = el('div.claude-panel', {}, this.tabsNode, this.mcpBanner, this.body, this.usage.node,
-      el('div.claude-bar.claude-settings', {}, ...(backend.kind === 'native' ? [this.agentSelect] : []), this.modelSelect, this.effortSelect, this.status));
+      el('div.claude-bar.claude-settings', {}, ...(backend.kind === 'native' ? [this.agentSelect] : []), this.modeSelect, this.modelSelect, this.effortSelect, this.status));
     this.remote = !!app.project.capabilities?.claudeRemote;     // the web IDE: the Claude of the user's computer
     this.historyLocal = backend.kind === 'native' && !this.remote;
     this.convs = [];
@@ -109,7 +114,7 @@ export class ClaudePanel {
 
   /** A new tab (a new conversation, or one from the history). */
   openConversation(data = {}, show = true) {
-    const c = new Conversation(this, { key: data.key || newKey(), session: data.session || null, items: data.items || [], title: data.title || '' });
+    const c = new Conversation(this, { key: data.key || newKey(), session: data.session || null, items: data.items || [], title: data.title || '', context: data.context || null });
     this.convs.push(c);
     if (show || !this.active) this.show(c);
     else this.renderTabs();
@@ -203,7 +208,7 @@ export class ClaudePanel {
   /** The open tabs, kept for the next start (the whole conversations are in the project's history). */
   saveTabs(detachedNow = []) {
     if (this.detached) return;
-    const tabs = this.convs.map((c) => ({ key: c.key, session: c.session, title: c.name || '', items: c.items.slice(-200) }));
+    const tabs = this.convs.map((c) => ({ key: c.key, session: c.session, title: c.name || '', items: c.items.slice(-200), context: c.context || null }));
     prefs.set(this.key, { tabs, active: this.current()?.key || null });
     void detachedNow;     // a conversation in a window is not reopened as a tab at the next start: History has it
   }
@@ -366,16 +371,29 @@ export class ClaudePanel {
         : el('button', { title: 'Open this conversation in a window', onclick: () => this.current() && this.undock(this.current()) }, icon('split')),
       el('button', { title: 'What Claude may do: ' + MODES[this.mode][0], onclick: (e) => menu([
         { head: 'What Claude may do' },
-        ...Object.entries(MODES).map(([id, [label, hint]]) => ({ label, hint, checked: this.mode === id, action: () => {
-          this.mode = id;
-          prefs.set('claudeMode', id);
-          this.app.refreshToolHeader?.('claude');
-        } })),
+        ...Object.entries(MODES).map(([id, [label, hint]]) => ({ label, hint, checked: this.mode === id, action: () => this.setMode(id) })),
+        '-',
+        { label: 'Forget the permissions given', hint: 'the session\'s, the timed ones and the always ones', action: () => { this.tools?.revokePermissions(); notify('Permissions forgotten', 'info', { title: 'Claude' }); } },
       ], e.currentTarget) }, icon('settings')),
     ].filter(Boolean);
   }
 
   say(text) { this.status.textContent = text; }
+
+  /** What Claude may do (claude --permission-mode): kept, applies from the next message. */
+  setMode(id) {
+    if (!MODES[id]) return;
+    this.mode = id;
+    this.modeSelect.value = id;
+    prefs.set('claudeMode', id);
+    this.app.refreshToolHeader?.('claude');
+  }
+
+  /** Shift+Tab: the next mode, as in Claude Code's terminal. */
+  cycleMode() {
+    const ids = Object.keys(MODES);
+    this.setMode(ids[(ids.indexOf(this.mode) + 1) % ids.length]);
+  }
 
   /** The editor's "Ask Claude": the window, the current conversation, text in its box. */
   ask(text = '') {
@@ -389,7 +407,8 @@ export class ClaudePanel {
 
 /** One conversation: its log, its plan, its box, its Claude Code process (a tab of the Claude window). */
 class Conversation {
-  constructor(panel, { key, session, items, title }) {
+  constructor(panel, { key, session, items, title, context = null }) {
+    this.context = context;
     this.panel = panel;
     this.app = panel.app;
     this.key = key;
@@ -403,10 +422,19 @@ class Conversation {
     // a permission asked) it went back to the top; a reader who scrolled up is left where they are
     this.stick = true;
     this.log.addEventListener('scroll', () => { if (this.log.clientHeight > 0) this.stick = this.log.scrollHeight - this.log.scrollTop - this.log.clientHeight < 80; });
+    // the content grows by itself (a tool's result, markdown, an image, the spinner moving): while the reader is at the bottom, follow it
+    if (typeof MutationObserver !== 'undefined') {
+      let pending = false;
+      new MutationObserver(() => {
+        if (pending || !this.stick) return;
+        pending = true;
+        requestAnimationFrame(() => { pending = false; if (this.stick && this.log.clientHeight > 0) this.log.scrollTop = this.log.scrollHeight; });
+      }).observe(this.log, { childList: true, subtree: true, characterData: true });
+    }
     if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { if (this.stick && this.log.clientHeight > 0) this.log.scrollTop = this.log.scrollHeight; }).observe(this.log);
     this.plan = el('div.claude-plan', { hidden: true });
     this.input = el('textarea.input.claude-input', { rows: 3, placeholder: 'Ask Claude… (Enter to send, Shift+Enter: new line, @path: a file)',
-      onkeydown: (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); this.send(); } } });
+      onkeydown: (e) => { if (e.key === 'Tab' && e.shiftKey) { e.preventDefault(); this.panel.cycleMode(); return; } if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); this.send(); } } });
     this.sendBtn = el('button.btn.primary.small', { title: 'Send (Enter): while Claude works, it reads it at once', onclick: () => this.send() }, 'Send');
     this.stopBtn = el('button.btn.small', { title: 'Stop Claude', hidden: true, onclick: () => this.stop() }, icon('stop'), 'Stop');
     this.node = el('div.claude-conv', {}, this.plan, this.log, el('div.claude-compose', {}, this.input,
@@ -508,6 +536,11 @@ class Conversation {
     if (/^\/(rc|remote-control)$/.test(prompt)) { this.remoteControl(); return; }
     await this.app.editors?.saveAll(true);
     this.log.querySelector('.claude-empty')?.remove();
+    // once per project: where what the AI does is kept
+    if (!p.remote && backend.kind === 'native' && !prefs.get('iaNote:' + p.app.projectKey, false)) {
+      prefs.set('iaNote:' + p.app.projectKey, true);
+      this.add({ role: 'note', text: 'Each turn of Claude / OpenCode is saved in the project\'s IA/HISTORY folder (IA/HISTORY/<assistant>/<model>/<date>/<request>.md). It is NOT sent to git (IA/ is in .gitignore): it stays on this computer only, so it is lost if you delete the project folder or change computer.' });
+    }
     const during = !!this.run;
     this.add({ role: 'user', text: prompt, during });
     this.input.value = '';
@@ -536,15 +569,16 @@ class Conversation {
   startTurn(id) {
     this.run = { id, started: Date.now(), tools: 0 };
     this.stopBtn.hidden = false;
-    this.input.placeholder = this.panel.remote ? 'Claude is working…' : 'Tell Claude more while it works: it reads it at once (Enter)';
+    const who = this.panel.agent === 'opencode' ? 'OpenCode' : 'Claude';
+    this.input.placeholder = this.panel.remote ? `${who} is working…` : this.panel.agent === 'opencode' ? 'OpenCode is working… (one message at a time)' : 'Tell Claude more while it works: it reads it at once (Enter)';
     this.thinking?.remove();
-    this.thinking = el('div.claude-thinking', {}, el('span.spinner'), 'Claude is working…');
+    this.thinking = el('div.claude-thinking', {}, el('span.spinner'), `${who} is working…`);
     this.log.append(this.thinking);
     this.scroll();
     this.panel.say('working…');
     this.panel.renderTabs();
     this.task?.();
-    this.task = this.app.task?.(`Claude is working… (${this.title()})`, { open: () => { this.app.showTool('claude'); this.panel.show(this); } }) || null;
+    this.task = this.app.task?.(`${who} is working… (${this.title()})`, { open: () => { this.app.showTool('claude'); this.panel.show(this); } }) || null;
   }
 
   /** The turn is over (its result, or the process ended): what it changed comes in. */
@@ -588,11 +622,15 @@ class Conversation {
     const panel = this.panel;
     if (event.type === 'system' && event.subtype === 'init') {
       panel.say(event.model ? `${event.model}` : 'working…');
+      // the context window is only reported with the turn's result: until then, the model's usual one, so the bar moves from the first answer
+      if (!this.context?.window) this.context = { ...this.context, window: /\[1m\]|1m$/i.test(event.model || '') ? 1000000 : 200000 };
+      if (panel.active === this) panel.usage.context(this.context);
     } else if (event.type === 'assistant') {
       const u = event.message?.usage;
       if (u && !event.parent_tool_use_id) {
         this.context = { ...this.context, used: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.output_tokens || 0) };
         if (panel.active === this) panel.usage.context(this.context);
+        panel.saveSoon();
       }
       for (const part of event.message?.content || []) {
         if (part.type === 'text' && part.text?.trim()) this.add({ role: 'assistant', text: part.text });
@@ -603,7 +641,7 @@ class Conversation {
           panel.planTarget = this;
           panel.watch.use(part);
           panel.planTarget = null;
-          this.task?.update(`Claude: ${toolText(part.name, part.input || {}, this.app.project?.root || '')}`);
+          this.task?.update(`${who}: ${toolText(part.name, part.input || {}, this.app.project?.root || '')}`);
         }
       }
     } else if (event.type === 'user') {
@@ -624,9 +662,28 @@ class Conversation {
         this.add({ role: 'note', text: `Refused (mode “${MODES[panel.mode][0]}”): ${event.permission_denials.map((d) => d.tool_name).join(', ')}. Change what Claude may do (⚙) and ask again.` });
       }
       this.add({ role: 'done', text: `${event.is_error ? 'Stopped' : 'Done'} · ${seconds} s · ${this.run.tools} action(s)${cost}` });
-      if (!panel.remote) { this.endTurn(); return; }
+      if (!panel.remote) { this.endTurn(); this.autoCompact(); return; }
     }
     this.save();
+  }
+
+  /**
+   * Claude Code's own automatic compaction does not always run in this window (claude -p): when the context is 80 % full at the
+   * end of a turn, /compact is sent, as one would type it. The gauge restarts from the summary.
+   */
+  autoCompact() {
+    const p = this.panel;
+    if (this.compacting) {                // the /compact turn just ended: the old size no longer counts
+      this.compacting = false;
+      this.context = { ...this.context, used: 0 };
+      if (p.active === this) p.usage.context(this.context);
+      return;
+    }
+    const c = this.context;
+    if (p.agent !== 'claude' || p.remote || prefs.get('claudeAutoCompact', true) === false || !c?.used || !c?.window || c.used / c.window < 0.8) return;
+    this.compacting = true;
+    this.add({ role: 'note', text: `The context is ${Math.round(100 * c.used / c.window)} % full: compacting it now (/compact) so the conversation goes on.` });
+    setTimeout(() => { this.input.value = '/compact'; this.send(); }, 300);
   }
 
   exit({ id, code, error, changed }) {
@@ -758,7 +815,7 @@ export class UsageGauges {
     this.saved = prefs.get('claudeLimits', {}) || {};
     this.context(null);
     this.paint();
-    setInterval(() => this.paint(), 60000);
+    setInterval(() => this.paint(), 15000);
   }
 
   /** rate_limit_info of a rate_limit_event: {unifiedWindows: {five_hour: {utilization, resetsAt}, seven_day: ...}} */
