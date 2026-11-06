@@ -14,10 +14,10 @@ final class ConnectionStore
     public const FILE = 'connections.json';
     public const BLANK = ['id' => '', 'name' => '', 'kind' => 'mysql', 'host' => '127.0.0.1', 'port' => 3306, 'user' => 'root',
         'password' => '', 'savePassword' => true, 'database' => '', 'color' => '#3b6ef5',
-        'ssh' => false, 'sshHost' => '', 'sshPort' => 22, 'sshUser' => '', 'sshAuth' => 'agent', 'sshKey' => '', 'sshPassphrase' => '',
+        'ssh' => false, 'sshHost' => '', 'sshPort' => 22, 'sshUser' => '', 'sshAuth' => 'agent', 'sshKey' => '', 'sshKeyText' => '', 'sshPassphrase' => '',
         'sshPassword' => ''];
     /** the secrets: not saved when "save password" is not ticked */
-    public const SECRETS = ['password', 'sshPassword', 'sshPassphrase'];
+    public const SECRETS = ['password', 'sshPassword', 'sshPassphrase', 'sshKeyText'];
 
     public function __construct(private Storage $storage)
     {

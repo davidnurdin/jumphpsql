@@ -99,6 +99,7 @@ form:
                   children:
                     - {type: label, text: 'Private key file'}
                     - {type: textbox, id: sshKey, placeholder: '~/.ssh/id_ed25519'}
+                    - {type: button, id: sshKeyChoose, text: 'Choose the key file…', visible: false, events: {click: onSshKeyChoose}}
                     - {type: label, text: 'Passphrase (if the key has one)'}
                     - {type: textbox, id: sshPassphrase, password: true}
                 - type: column

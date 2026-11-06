@@ -86,14 +86,14 @@ final class Endpoint
     }
 
     /**
-     * The options of Ssh::via() for the browser: the key was pasted as text (a textbox flattens its lines: the header, the base64
-     * body and the footer are put back in shape), the secret is the passphrase (key) or the password.
+     * The options of Ssh::via() for the browser: the key's text (read from the file the person chose; a pasted one is put back in shape:
+     * the header, the base64 body and the footer), the secret is the passphrase (key) or the password.
      *
      * @return array<string, mixed>
      */
     private function browserSsh(): array
     {
-        $key = trim((string)($this->config['sshKey'] ?? ''));
+        $key = trim((string)($this->config['sshKeyText'] ?? '')) ?: trim((string)($this->config['sshKey'] ?? ''));
         if (preg_match('/-----BEGIN ([A-Z ]+)-----(.*?)-----END \1-----/s', $key, $m)) {
             $key = "-----BEGIN {$m[1]}-----\n" . chunk_split((string)preg_replace('/\s+/', '', $m[2]), 70, "\n") . "-----END {$m[1]}-----\n";
         } else {

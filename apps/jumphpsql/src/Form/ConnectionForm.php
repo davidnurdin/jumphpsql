@@ -8,6 +8,8 @@ use App\Db\MysqlConnection;
 use App\Db\MysqlError;
 use App\Db\SshTunnel;
 use JumPHP\Gui\Button;
+use JumPHP\Native\FilePicker;
+use JumPHP\Native\Native;
 use JumPHP\Gui\CheckBox;
 use JumPHP\Gui\ComboBox;
 use JumPHP\Gui\Container;
@@ -39,6 +41,7 @@ use JumPHP\Gui\TextBox;
  * @property ComboBox $sshAuth
  * @property Container $sshKeyBox
  * @property TextBox $sshKey
+ * @property Button $sshKeyChoose
  * @property TextBox $sshPassphrase
  * @property Container $sshPasswordBox
  * @property TextBox $sshPassword
@@ -79,6 +82,12 @@ final class ConnectionForm extends Form
         $this->sshUser->text = (string)$c['sshUser'];
         $this->sshAuth->selected = max(0, (int)array_search($c['sshAuth'], array_keys(SshTunnel::AUTHS), true));
         $this->sshKey->text = (string)$c['sshKey'];
+        $this->keyText = (string)($c['sshKeyText'] ?? '');
+        // a browser has no path to a key on the person's computer: the system's file chooser reads the file (its text is kept with the connection)
+        $browser = \JumPHP\Kernel\Platform::isWasm() && Native::supports('open');
+        $this->sshKeyChoose->visible = $browser;
+        $this->sshKey->visible = !$browser;
+        $this->sshKeyChoose->text = $this->keyText !== '' ? 'Key loaded: choose another file…' : 'Choose the key file…';
         $this->sshPassphrase->text = (string)$c['sshPassphrase'];
         $this->sshPassword->text = (string)$c['sshPassword'];
         $this->delete->visible = $editing;
@@ -87,6 +96,8 @@ final class ConnectionForm extends Form
         $this->showSsh();
         $this->setFocus($editing ? $this->password : $this->name);
     }
+
+    private string $keyText = '';
 
     private function authKey(): string
     {
@@ -108,6 +119,27 @@ final class ConnectionForm extends Form
             'password' => 'The password is given to ssh, never written to a file.',
             default => 'ssh decides: ~/.ssh/config (ProxyJump, IdentityFile...), the default keys, the agent.',
         } . ' The host key is accepted the first time, then checked.';
+    }
+
+    /** The key file, chosen on the person's computer (the browser build). */
+    public function onSshKeyChoose(Button $sender): void
+    {
+        FilePicker::open(['title' => 'SSH private key'])->then(function (?string $file): void {
+            if ($file === null) {
+                return;
+            }
+            $text = (string)@file_get_contents($file);
+            @unlink($file);
+            if (!str_contains($text, 'PRIVATE KEY')) {
+                $this->result->text = 'This file is not an SSH private key.';
+                return;
+            }
+            $this->keyText = $text;
+            $this->sshKeyChoose->text = 'Key loaded: choose another file…';
+            $this->result->text = '';
+        }, function (\Throwable $e): void {
+            $this->result->text = 'The file chooser failed: ' . $e->getMessage();
+        });
     }
 
     public function onUseSshChange(CheckBox $sender, bool $checked): void
@@ -136,7 +168,7 @@ final class ConnectionForm extends Form
         return ['name' => $name, 'host' => $host, 'port' => $port, 'user' => $user, 'password' => $this->password->text,
             'savePassword' => $this->savePassword->checked, 'database' => trim($this->database->text),
             'ssh' => $ssh, 'sshHost' => $sshHost, 'sshPort' => (int)trim($this->sshPort->text) ?: 22, 'sshUser' => trim($this->sshUser->text),
-            'sshAuth' => $this->authKey(), 'sshKey' => trim($this->sshKey->text), 'sshPassphrase' => $this->sshPassphrase->text,
+            'sshAuth' => $this->authKey(), 'sshKey' => trim($this->sshKey->text), 'sshKeyText' => $this->keyText, 'sshPassphrase' => $this->sshPassphrase->text,
             'sshPassword' => $this->sshPassword->text] + $this->connection;
     }
 
