@@ -35,7 +35,29 @@ final class Endpoint
         }
         $this->opening = new Promise();
         if ($this->usesSsh() && \JumPHP\Kernel\Platform::isWasm()) {
-            $this->opening->reject(new MysqlError('SSH tunnels need the desktop app: a browser cannot run ssh. Edit the connection to connect directly.'));
+            // a browser has no ssh program and no local port: OpenSSH compiled to WebAssembly pipes the MySQL stream (`ssh -W`)
+            $ssh = $this->config['ssh_engine'] ?? null;
+            if (!$ssh instanceof \JumPHP\Net\Ssh) {
+                $this->opening->reject(new MysqlError('SSH needs the engine\'s SSH client.'));
+                return $this->opening;
+            }
+            $this->connect(['tcp' => new class($ssh->via($this->browserSsh()), $this->knownHosts) {
+                public function __construct(private \JumPHP\Net\SshConnector $via, private string $knownHostsFile)
+                {
+                }
+
+                public function connect(string $host, int $port, float $timeout = 30.0): \JumPHP\Net\SshConnection
+                {
+                    $connection = $this->via->connect($host, $port, $timeout);
+                    // a host key seen for the first time is kept (accept-new), the next sessions check it
+                    $connection->on('knownHosts', function (string $text): void {
+                        if ($text !== '' && $this->knownHostsFile !== '') {
+                            @file_put_contents($this->knownHostsFile, $text);
+                        }
+                    });
+                    return $connection;
+                }
+            }] + $this->config);
             return $this->opening;
         }
         if (!$this->usesSsh()) {
@@ -61,6 +83,27 @@ final class Endpoint
             $this->tunnel?->close();
             $this->opening?->reject($why !== '' ? new MysqlError($why . ' (' . $e->getMessage() . ')') : $e);
         });
+    }
+
+    /**
+     * The options of Ssh::via() for the browser: the key was pasted as text (a textbox flattens its lines: the header, the base64
+     * body and the footer are put back in shape), the secret is the passphrase (key) or the password.
+     *
+     * @return array<string, mixed>
+     */
+    private function browserSsh(): array
+    {
+        $key = trim((string)($this->config['sshKey'] ?? ''));
+        if (preg_match('/-----BEGIN ([A-Z ]+)-----(.*?)-----END \1-----/s', $key, $m)) {
+            $key = "-----BEGIN {$m[1]}-----\n" . chunk_split((string)preg_replace('/\s+/', '', $m[2]), 70, "\n") . "-----END {$m[1]}-----\n";
+        } else {
+            $key = '';
+        }
+        $auth = (string)($this->config['sshAuth'] ?? 'auto');
+        return ['sshHost' => (string)($this->config['sshHost'] ?? ''), 'sshPort' => (int)($this->config['sshPort'] ?? 22), 'sshUser' => (string)($this->config['sshUser'] ?? ''),
+            'sshKey' => $key, 'sshPassphrase' => $auth === 'key' ? (string)($this->config['sshPassphrase'] ?? '') : '',
+            'sshPassword' => $auth === 'password' ? (string)($this->config['sshPassword'] ?? '') : '',
+            'knownHosts' => $this->knownHosts !== '' && is_file($this->knownHosts) ? (string)file_get_contents($this->knownHosts) : ''];
     }
 
     /** @return array<string, mixed> the connection as MySQL sees it: through the tunnel's port when there is one */

@@ -214,7 +214,7 @@ final class MainForm extends Form
             return $endpoint->open();
         }
         $c = $this->config($id);
-        $endpoint = $this->live[$id] = new Endpoint(['tcp' => $this->engine->tcp()] + $c, $this->engine->storage->path('known_hosts'));
+        $endpoint = $this->live[$id] = new Endpoint(['tcp' => $this->engine->tcp(), 'ssh_engine' => $this->engine->ssh()] + $c, $this->engine->storage->path('known_hosts'));
         $endpoint->onClose = function (string $why) use ($id): void {
             unset($this->live[$id]);
             $this->status->text = $this->connection($id)['name'] . ': ' . $why;

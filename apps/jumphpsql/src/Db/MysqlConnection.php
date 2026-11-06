@@ -35,7 +35,8 @@ final class MysqlConnection
     /** @var resource|null */
     private $stream = null;
     /** the connection through the engine (JumPHP\Net\Tcp: a socket on desktop, the playground's TCP bridge in the browser) */
-    private ?\JumPHP\Net\TcpConnection $conn = null;
+    /** @var \JumPHP\Net\TcpConnection|\JumPHP\Net\SshConnection|null */
+    private ?object $conn = null;
     private string $in = '';
     private string $out = '';
     private int $seq = 0;
@@ -48,7 +49,7 @@ final class MysqlConnection
     private ?Promise $connecting = null;
     private bool $working = false;
 
-    /** @param array{host?: string, port?: int|string, user?: string, password?: string, database?: string, timeout?: float, tcp?: ?\JumPHP\Net\Tcp} $config */
+    /** @param array{host?: string, port?: int|string, user?: string, password?: string, database?: string, timeout?: float, tcp?: ?object} $config an object with connect($host, $port, $timeout): JumPHP\Net\Tcp, or Ssh::via() */
     public function __construct(public readonly array $config)
     {
     }
@@ -74,7 +75,7 @@ final class MysqlConnection
         $host = $host === 'localhost' ? '127.0.0.1' : $host;
         $port = (int)($this->config['port'] ?? 3306);
         $timeout = (float)($this->config['timeout'] ?? 10);
-        if (($tcp = $this->config['tcp'] ?? null) instanceof \JumPHP\Net\Tcp) {
+        if (is_object($tcp = $this->config['tcp'] ?? null) && method_exists($tcp, 'connect')) {
             $this->state = 'connecting';
             $this->deadline = microtime(true) + $timeout;
             $conn = $this->conn = $tcp->connect($host, $port, $timeout);
@@ -238,7 +239,9 @@ final class MysqlConnection
                 @stream_select($read, $write, $except, 0, 20000);
             }
             if ($this->conn !== null) {
-                ($this->config['tcp'])->poll();
+                if (method_exists($this->config['tcp'], 'poll')) {
+                    $this->config['tcp']->poll();
+                }
                 usleep(2000);
             }
             $this->poll();
