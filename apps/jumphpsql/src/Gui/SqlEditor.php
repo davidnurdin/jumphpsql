@@ -800,6 +800,17 @@ class SqlEditor extends Widget
                     case Pointer::RIGHT:
                         $this->moveWord($key === Pointer::LEFT ? -1 : 1, $s);
                         break;
+                    case Pointer::BACKSPACE:
+                    case Pointer::DELETE:
+                        // Ctrl+Backspace / Ctrl+Delete: the word before / after the cursor (the selection, when there is one)
+                        if (!$this->props['readonly']) {
+                            if ($this->selectedText() === '') {
+                                $this->moveWord($key === Pointer::BACKSPACE ? -1 : 1, true);
+                            }
+                            $this->snapshot('delete');
+                            $this->deleteSelection();
+                        }
+                        break;
                     default:
                         $used = false;
                 }
