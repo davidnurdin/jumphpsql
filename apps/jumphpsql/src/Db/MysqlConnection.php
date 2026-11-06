@@ -5,7 +5,7 @@ namespace App\Db;
 /**
  * A connection to a MySQL or MariaDB server, in pure PHP (the client/server protocol over a TCP socket): no mysqli nor
  * PDO needed, and it never blocks the window. Commands are queued and answered by promises; poll() (called every frame)
- * moves the bytes. The protocol itself is written straight, in a Fiber that waits for the bytes it needs.
+ * moves the bytes. The protocol itself is written straight, in a generator that waits (yield) for the bytes it needs: PHP in the browser has no Fibers (WebAssembly has no context switching), generators run everywhere.
  *
  *   $db = new MysqlConnection(['host' => '127.0.0.1', 'port' => 3306, 'user' => 'root', 'password' => '']);
  *   $db->connect()->then(fn () => ..., fn (\Throwable $e) => ...);
@@ -40,7 +40,9 @@ final class MysqlConnection
     private string $in = '';
     private string $out = '';
     private int $seq = 0;
-    private ?\Fiber $fiber = null;
+    /** the protocol, a generator waiting for the bytes it needs */
+    private ?\Generator $fiber = null;
+    private bool $fiberStarted = false;
     private float $deadline = 0;
     /** @var list<array{0: string, 1: mixed, 2: Promise}> */
     private array $queue = [];
@@ -84,7 +86,8 @@ final class MysqlConnection
             });
             $conn->on('open', function (): void {
                 if ($this->state === 'connecting' && $this->fiber === null) {
-                    $this->fiber = new \Fiber(fn () => $this->work());
+                    $this->fiber = $this->work();
+                    $this->fiberStarted = false;
                     $this->resume();
                     $this->flush();
                 }
@@ -202,7 +205,8 @@ final class MysqlConnection
                 $this->dispatch();
                 return;
             }
-            $this->fiber = new \Fiber(fn () => $this->work());
+            $this->fiber = $this->work();
+                    $this->fiberStarted = false;
             $this->resume();
         }
         for ($turn = 0; $turn < 64 && $this->stream !== null; $turn++) {
@@ -288,12 +292,17 @@ final class MysqlConnection
 
     private function resume(): void
     {
-        $fiber = $this->fiber;
-        if ($fiber === null || $fiber->isTerminated()) {
+        $co = $this->fiber;
+        if ($co === null || ($this->fiberStarted && !$co->valid())) {
             return;
         }
         try {
-            $fiber->isStarted() ? ($fiber->isSuspended() ? $fiber->resume() : null) : $fiber->start();
+            if ($this->fiberStarted) {
+                $co->next();
+            } else {
+                $this->fiberStarted = true;
+                $co->current();
+            }
         } catch (MysqlError $e) {
             $this->fail($e->getMessage());
         } catch (\Throwable $e) {
@@ -349,14 +358,14 @@ final class MysqlConnection
 
     // the protocol (inside the fiber) ------------------------------------------------------------------------------
 
-    private function work(): void
+    private function work(): \Generator
     {
-        $this->handshake();
+        yield from $this->handshake();
         $this->state = 'ready';
         $this->settled[] = [$this->connecting, $this, null];
         while (true) {
             if ($this->queue === []) {
-                \Fiber::suspend();
+                yield;
                 continue;
             }
             [$kind, $arg, $promise] = array_shift($this->queue);
@@ -364,9 +373,9 @@ final class MysqlConnection
             $this->current = $promise;
             try {
                 $value = match ($kind) {
-                    'query' => $this->runQuery((string)$arg[0], (int)$arg[1]),
-                    'initdb' => $this->simple("\x02" . $arg),
-                    'ping' => $this->simple("\x0e"),
+                    'query' => yield from $this->runQuery((string)$arg[0], (int)$arg[1]),
+                    'initdb' => yield from $this->simple("\x02" . $arg),
+                    'ping' => yield from $this->simple("\x0e"),
                     default => null,
                 };
                 if ($kind === 'initdb') {
@@ -384,12 +393,12 @@ final class MysqlConnection
         }
     }
 
-    private function readPacket(): string
+    private function readPacket(): \Generator
     {
         $payload = '';
         do {
             while (strlen($this->in) < 4 || strlen($this->in) < 4 + (unpack('V', substr($this->in, 0, 3) . "\0")[1])) {
-                \Fiber::suspend();
+                yield;
                 if ($this->stream === null && $this->conn === null) {
                     throw new MysqlError($this->error ?? 'Connection closed');
                 }
@@ -420,10 +429,10 @@ final class MysqlConnection
     }
 
     /** A command answered by OK or ERR. */
-    private function simple(string $payload): ResultSet
+    private function simple(string $payload): \Generator
     {
         $this->command($payload);
-        $packet = $this->readPacket();
+        $packet = (yield from $this->readPacket());
         $this->checkError($packet);
         $result = new ResultSet();
         $this->parseOk($packet, $result);
@@ -440,9 +449,9 @@ final class MysqlConnection
         }
     }
 
-    private function handshake(): void
+    private function handshake(): \Generator
     {
-        $packet = $this->readPacket();
+        $packet = (yield from $this->readPacket());
         $this->checkError($packet);
         $pos = 1;
         $this->serverVersion = $this->zstring($packet, $pos);
@@ -473,15 +482,15 @@ final class MysqlConnection
         $this->writePacket(pack('VVC', $flags, 0x1000000, self::UTF8MB4) . str_repeat("\0", 23)
             . (string)($this->config['user'] ?? 'root') . "\0" . $this->lenencInt(strlen($auth)) . $auth
             . ($database !== '' ? $database . "\0" : '') . $plugin . "\0");
-        $this->authLoop($plugin, $scramble);
+        yield from $this->authLoop($plugin, $scramble);
         $this->database = $database !== '' ? $database : null;
     }
 
-    private function authLoop(string $plugin, string $scramble): void
+    private function authLoop(string $plugin, string $scramble): \Generator
     {
         $password = (string)($this->config['password'] ?? '');
         while (true) {
-            $packet = $this->readPacket();
+            $packet = (yield from $this->readPacket());
             $this->checkError($packet);
             $head = $packet[0] ?? '';
             if ($head === "\x00") {
@@ -565,8 +574,8 @@ final class MysqlConnection
         return sodium_crypto_sign_detached($scramble, sodium_crypto_sign_secretkey($keys));
     }
 
-    /** @return list<ResultSet> */
-    private function runQuery(string $sql, int $maxRows): array
+    /** @return \Generator<int, mixed, mixed, list<ResultSet>> */
+    private function runQuery(string $sql, int $maxRows): \Generator
     {
         $started = microtime(true);
         $this->command("\x03" . $sql);
@@ -574,25 +583,25 @@ final class MysqlConnection
         do {
             $result = new ResultSet();
             $result->sql = $sql;
-            $packet = $this->readPacket();
+            $packet = (yield from $this->readPacket());
             $this->checkError($packet);
             $more = false;
             if ($packet[0] === "\x00") {
                 $more = ($this->parseOk($packet, $result) & self::MORE_RESULTS) !== 0;
             } elseif ($packet[0] === "\xfb") {
                 $this->writePacket('');      // LOAD DATA LOCAL INFILE: refused (no file sent)
-                $packet = $this->readPacket();
+                $packet = (yield from $this->readPacket());
                 $this->checkError($packet);
                 $more = ($this->parseOk($packet, $result) & self::MORE_RESULTS) !== 0;
             } else {
                 $pos = 0;
                 $count = (int)$this->lenencIntAt($packet, $pos);
                 for ($i = 0; $i < $count; $i++) {
-                    $result->columns[] = $this->parseColumn($this->readPacket());
+                    $result->columns[] = $this->parseColumn((yield from $this->readPacket()));
                 }
-                $this->readPacket();          // EOF
+                (yield from $this->readPacket());          // EOF
                 while (true) {
-                    $packet = $this->readPacket();
+                    $packet = (yield from $this->readPacket());
                     if ($packet !== '' && $packet[0] === "\xfe" && strlen($packet) < 9) {
                         $status = unpack('v', substr($packet, 3, 2))[1];
                         $result->warnings = unpack('v', substr($packet, 1, 2))[1];
