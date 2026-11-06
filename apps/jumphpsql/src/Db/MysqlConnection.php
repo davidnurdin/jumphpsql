@@ -34,6 +34,8 @@ final class MysqlConnection
 
     /** @var resource|null */
     private $stream = null;
+    /** the connection through the engine (JumPHP\Net\Tcp: a socket on desktop, the playground's TCP bridge in the browser) */
+    private ?\JumPHP\Net\TcpConnection $conn = null;
     private string $in = '';
     private string $out = '';
     private int $seq = 0;
@@ -72,6 +74,28 @@ final class MysqlConnection
         $host = $host === 'localhost' ? '127.0.0.1' : $host;
         $port = (int)($this->config['port'] ?? 3306);
         $timeout = (float)($this->config['timeout'] ?? 10);
+        if (($tcp = $this->config['tcp'] ?? null) instanceof \JumPHP\Net\Tcp) {
+            $this->state = 'connecting';
+            $this->deadline = microtime(true) + $timeout;
+            $conn = $this->conn = $tcp->connect($host, $port, $timeout);
+            $conn->on('data', function (string $data): void {
+                $this->in .= $data;
+            });
+            $conn->on('open', function (): void {
+                if ($this->state === 'connecting' && $this->fiber === null) {
+                    $this->fiber = new \Fiber(fn () => $this->work());
+                    $this->resume();
+                    $this->flush();
+                }
+            });
+            $conn->on('close', function (?string $why) use ($host, $port): void {
+                if ($this->state === 'closed') {
+                    return;
+                }
+                $this->fail($this->state === 'connecting' ? "Can't connect to $host:$port: " . ($why ?? 'connection closed') : 'Lost connection to the server');
+            });
+            return $this->connecting;
+        }
         $errno = 0;
         $error = '';
         $target = str_contains($host, ':') && !str_starts_with($host, '[') ? "[$host]" : $host;
@@ -121,6 +145,9 @@ final class MysqlConnection
         if ($this->stream !== null && $this->state === 'ready') {
             @fwrite($this->stream, pack('V', 1) . "\x01");      // COM_QUIT
         }
+        if ($this->conn !== null && $this->state === 'ready') {
+            $this->conn->write(pack('V', 1) . "\x01");
+        }
         $this->drop('Connection closed');
     }
 
@@ -139,6 +166,21 @@ final class MysqlConnection
 
     public function poll(): void
     {
+        if ($this->conn !== null) {
+            for ($turn = 0; $turn < 64 && $this->conn !== null && $this->fiber !== null; $turn++) {
+                $before = strlen($this->in) . '|' . count($this->queue) . '|' . strlen($this->out);
+                $this->resume();
+                $this->flush();
+                if ($before === strlen($this->in) . '|' . count($this->queue) . '|' . strlen($this->out)) {
+                    break;
+                }
+            }
+            if ($this->state === 'connecting' && microtime(true) > $this->deadline) {
+                $this->fail('Connection timed out');
+            }
+            $this->dispatch();
+            return;
+        }
         if ($this->stream === null) {
             $this->dispatch();
             return;
@@ -195,8 +237,12 @@ final class MysqlConnection
                 $except = null;
                 @stream_select($read, $write, $except, 0, 20000);
             }
+            if ($this->conn !== null) {
+                ($this->config['tcp'])->poll();
+                usleep(2000);
+            }
             $this->poll();
-            if ($this->stream === null && !$promise->isDone()) {
+            if ($this->stream === null && $this->conn === null && !$promise->isDone()) {
                 $this->poll();
                 if (!$promise->isDone()) {
                     throw new MysqlError($this->error ?? 'Connection closed');
@@ -221,6 +267,11 @@ final class MysqlConnection
 
     private function flush(): void
     {
+        if ($this->out !== '' && $this->conn !== null) {
+            $this->conn->write($this->out);
+            $this->out = '';
+            return;
+        }
         if ($this->out === '' || $this->stream === null) {
             return;
         }
@@ -272,8 +323,11 @@ final class MysqlConnection
             @fclose($this->stream);
         }
         $this->stream = null;
+        $conn = $this->conn;
+        $this->conn = null;
         $this->fiber = null;
         $this->state = 'closed';
+        $conn?->close();
         $this->working = false;
         foreach ($this->queue as [, , $promise]) {
             $this->settled[] = [$promise, null, new MysqlError($why)];
@@ -333,7 +387,7 @@ final class MysqlConnection
         do {
             while (strlen($this->in) < 4 || strlen($this->in) < 4 + (unpack('V', substr($this->in, 0, 3) . "\0")[1])) {
                 \Fiber::suspend();
-                if ($this->stream === null) {
+                if ($this->stream === null && $this->conn === null) {
                     throw new MysqlError($this->error ?? 'Connection closed');
                 }
             }

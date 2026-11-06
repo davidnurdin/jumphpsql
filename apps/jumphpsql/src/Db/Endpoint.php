@@ -34,6 +34,10 @@ final class Endpoint
             return $this->opening;
         }
         $this->opening = new Promise();
+        if ($this->usesSsh() && \JumPHP\Kernel\Platform::isWasm()) {
+            $this->opening->reject(new MysqlError('SSH tunnels need the desktop app: a browser cannot run ssh. Edit the connection to connect directly.'));
+            return $this->opening;
+        }
         if (!$this->usesSsh()) {
             $this->connect($this->mysqlConfig());
             return $this->opening;

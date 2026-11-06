@@ -7,6 +7,7 @@ use App\Db\Endpoint;
 use App\Db\MysqlConnection;
 use App\Db\MysqlError;
 use App\Db\SshTunnel;
+use JumPHP\Kernel\Platform;
 use JumPHP\Gui\Button;
 use JumPHP\Gui\CheckBox;
 use JumPHP\Gui\ComboBox;
@@ -73,7 +74,9 @@ final class ConnectionForm extends Form
         $this->password->text = (string)$c['password'];
         $this->savePassword->checked = (bool)$c['savePassword'];
         $this->database->text = (string)$c['database'];
-        $this->useSsh->checked = (bool)$c['ssh'];
+        $this->useSsh->checked = (bool)$c['ssh'] && !Platform::isWasm();
+        // a browser cannot run ssh: no tunnel option there (the database is reached through the playground's TCP bridge)
+        $this->sshBox->visible = !Platform::isWasm();
         $this->sshHost->text = (string)$c['sshHost'];
         $this->sshPort->text = (string)$c['sshPort'];
         $this->sshUser->text = (string)$c['sshUser'];
@@ -146,7 +149,7 @@ final class ConnectionForm extends Form
         $c = $this->typed();
         $this->result->text = ($c['ssh'] ? 'Opening the SSH tunnel to ' . $c['sshHost'] . '…' : 'Connecting to ' . $c['host'] . ':' . $c['port'] . '…');
         $this->result->color = '';
-        $trial = $this->trial = new Endpoint($c + ['timeout' => 8], $this->engine->storage->path('known_hosts'));
+        $trial = $this->trial = new Endpoint(['tcp' => $this->engine->tcp()] + $c + ['timeout' => 8], $this->engine->storage->path('known_hosts'));
         $trial->open()->then(function (MysqlConnection $db) use ($trial): void {
             $this->result->text = 'Connected: server ' . $db->serverVersion . ($trial->usesSsh() ? ', through SSH' : '');
             $this->result->color = '#1f9d55';

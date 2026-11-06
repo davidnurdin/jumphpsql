@@ -1,7 +1,7 @@
 # jumphpsql
 
 A MySQL / MariaDB client: a graphic PHP app (`JumPHP\Gui` forms, no HTML; AGENTS.md §17 of JumPHP, `docs/gui.md`).
-Desktop only for now: it opens TCP sockets (`stream_socket_client`), which the browser build does not have.
+Desktop and browser: it opens its connections through `$engine->tcp()` (`JumPHP\Net\Tcp`: a socket on desktop, the playground's TCP bridge in the browser, which needs the administrator's approval of this exact version: docs/tcp.md). SSH tunnels are desktop only (a browser cannot run `ssh`): the SSH box of the connection form is hidden there and a saved SSH connection answers an explanation.
 
 ## Code
 
