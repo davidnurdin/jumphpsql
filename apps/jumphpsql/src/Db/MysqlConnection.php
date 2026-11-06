@@ -48,7 +48,7 @@ final class MysqlConnection
     private ?Promise $connecting = null;
     private bool $working = false;
 
-    /** @param array{host?: string, port?: int|string, user?: string, password?: string, database?: string, timeout?: float} $config */
+    /** @param array{host?: string, port?: int|string, user?: string, password?: string, database?: string, timeout?: float, tcp?: ?\JumPHP\Net\Tcp} $config */
     public function __construct(public readonly array $config)
     {
     }

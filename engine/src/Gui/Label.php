@@ -9,6 +9,7 @@ use JumPHP\Renderer\Renderer;
  * go to the next line, default true), `style`: title | subtitle | muted.
  *
  * @property string $text
+ * @property string $color
  */
 class Label extends Widget
 {
