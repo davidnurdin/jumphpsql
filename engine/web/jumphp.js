@@ -280,7 +280,7 @@ function startTasks(FS, wasmBinary, remote) {
 
 const modules = {};
 async function loadModules() {
-	const list = [['device', 'jumphp-device.js'], ['http', 'jumphp-http.js'], ['pwa', 'jumphp-pwa.js'], ['gamepad', 'jumphp-gamepad.js']];
+	const list = [['device', 'jumphp-device.js'], ['http', 'jumphp-http.js'], ['pwa', 'jumphp-pwa.js'], ['gamepad', 'jumphp-gamepad.js'], ['ssh', 'jumphp-ssh.js']];
 	// a desktop app (game.yaml ui: webview): its pages and native side in HTML (JumPHP\Tauri\BrowserRuntime)
 	if (GAME.ui === 'webview') list.push(['app', 'jumphp-app.js']);
 	for (const [name, file] of list) {

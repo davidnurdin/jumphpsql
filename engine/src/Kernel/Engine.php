@@ -20,6 +20,7 @@ use JumPHP\Input\ActionMap;
 use JumPHP\Input\InputManager;
 use JumPHP\Loop\GameLoop;
 use JumPHP\Net\NetSession;
+use JumPHP\Net\Ssh;
 use JumPHP\Net\Tcp;
 use JumPHP\Renderer\BitmapFont;
 use JumPHP\Renderer\Renderer;
@@ -54,6 +55,7 @@ class Engine extends EventEmitter
     private ?Extensions $extensions = null;
     private ?NetSession $net = null;
     private ?Tcp $tcp = null;
+    private ?Ssh $ssh = null;
     private ?Tasks $tasks = null;
     private ?Http $http = null;
     private ?WebGl $gl = null;
@@ -214,6 +216,7 @@ class Engine extends EventEmitter
             $this->net->poll();
         }
         $this->tcp?->poll();
+        $this->ssh?->poll();
         $this->sound->update();
         $this->audio3d?->sync();
         $this->tasks?->poll();
@@ -278,6 +281,7 @@ class Engine extends EventEmitter
         $this->running = false;
         $this->net?->close();
         $this->tcp?->closeAll();
+        $this->ssh?->closeAll();
         $this->tasks?->shutdown();
         $this->gameLoop->stop();
     }
@@ -291,6 +295,7 @@ class Engine extends EventEmitter
         $this->running = false;
         $this->net?->close();
         $this->tcp?->closeAll();
+        $this->ssh?->closeAll();
         $this->tasks?->shutdown();
         $this->closeAudio3d();
         $this->sound->close();
@@ -332,6 +337,15 @@ class Engine extends EventEmitter
     public function tcp(): Tcp
     {
         return $this->tcp ??= new Tcp($this->config, $this->http());
+    }
+
+    /**
+     * SSH (`ssh -W` as a pipe, JumPHP\Net\Ssh): the system's ssh on desktop, OpenSSH compiled to WebAssembly in the browser (for an
+     * application the administrator approved for SSH). Polled each frame.
+     */
+    public function ssh(): Ssh
+    {
+        return $this->ssh ??= new Ssh($this->config, $this->http(), $this->bridge);
     }
 
     /** Background work: threads with the async runtime, between frames elsewhere (created on first use). */

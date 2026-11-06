@@ -18,6 +18,9 @@ class Keyboard
     private array $order = [];
     /** @var int[] keys that went down this frame, in order (text typing) */
     private array $typed = [];
+    /** Ctrl / Shift were held when a key went down this frame (a quick tap is over before the frame reads the modifier state) */
+    private bool $typedCtrl = false;
+    private bool $typedShift = false;
     /** the text typed this frame (SDL_TEXTINPUT: the layout, dead keys and input methods applied) */
     private string $text = '';
     /** what an input method is composing (not typed yet) */
@@ -42,8 +45,32 @@ class Keyboard
             $this->pressed[$key] = true;
             $this->order[] = $key;
             $this->typed[] = $key;
+            $this->typedCtrl = $this->typedCtrl || $this->ctrlHeld();
+            $this->typedShift = $this->typedShift || $this->shiftHeld();
         }
         $this->held[$key] = true;
+    }
+
+    /** Ctrl (or the Cmd / GUI key) is down now. */
+    public function ctrlHeld(): bool
+    {
+        return isset($this->held[1073742048]) || isset($this->held[1073742052]) || isset($this->held[1073742051]) || isset($this->held[1073742055]);
+    }
+
+    public function shiftHeld(): bool
+    {
+        return isset($this->held[1073742049]) || isset($this->held[1073742053]);
+    }
+
+    /** Ctrl was down when a key went down this frame, even if it is let go already. */
+    public function typedWithCtrl(): bool
+    {
+        return $this->typedCtrl;
+    }
+
+    public function typedWithShift(): bool
+    {
+        return $this->typedShift;
     }
 
     public function up(int $key): void
@@ -123,6 +150,7 @@ class Keyboard
         $this->pressed = [];
         $this->released = [];
         $this->typed = [];
+        $this->typedCtrl = $this->typedShift = false;
         $this->text = '';
     }
 

@@ -12,6 +12,8 @@ rm -rf "$OUT"
 mkdir -p "$OUT"
 cp -R "$STAGE".web/. "$OUT/"
 cp "$ENGINE/php-web.mjs" "$ENGINE/php-web.wasm" "$ENGINE/php-wasm-network.js" "$ENGINE/engine.json" "$OUT/"
+# OpenSSH as WebAssembly (bin/jumphp ssh:build), for applications that use $engine->ssh()
+[ -f /workspace/build/ssh/ssh.wasm ] && cp /workspace/build/ssh/ssh.js /workspace/build/ssh/ssh.wasm "$OUT/"
 
 cd "$OUT"
 python3 /emsdk/upstream/emscripten/tools/file_packager.py php-web.data \

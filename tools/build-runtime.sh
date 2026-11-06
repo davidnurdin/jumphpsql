@@ -38,6 +38,7 @@ cp "$ENGINE/php-web.mjs" "$ENGINE/php-web.wasm" "$ENGINE/php-wasm-network.js" "$
 for f in /workspace/engine/web/*.js; do
     [ "$(basename "$f")" = sw.js ] || cp "$f" "$OUT/"
 done
+[ -f /workspace/build/ssh/ssh.wasm ] && cp /workspace/build/ssh/ssh.js /workspace/build/ssh/ssh.wasm "$OUT/"
 cp /workspace/engine/web/index.html "$OUT/page.html"
 
 cd "$OUT"

@@ -129,6 +129,7 @@ Setup
   runtime:build             the shared engine of remote games (a games site) -> build/runtime
                             + .build/jumphp-runtime.tar.gz (+ .sha256), the release asset (docs/remote.md)
   runtime:download [version]  download it from the GitHub release instead
+  ssh:build                 OpenSSH's ssh client as WebAssembly (docker/ssh-wasm) -> build/ssh/ssh.js + ssh.wasm, packed in the runtime (docs/ssh-wasm.md)
   tidy [--examples] [--yes]  remove JumPHP's own development files from this project (tools/project-clean.list)
   update                    merge the newest JumPHP (git remote "jumphp") into the project
   cli:install               the `jumphp` command for the whole system (~/.local/bin): `jumphp test pong` from
@@ -472,7 +473,16 @@ cmd_engine_pack() {
 }
 
 # The shared engine of remote games (docs/remote.md): build/runtime, and its release asset.
+# OpenSSH's ssh client compiled to WebAssembly (emscripten, in Docker): the SSH of applications in the browser ($engine->ssh()).
+cmd_ssh_build() {
+  command -v docker >/dev/null || die "docker is needed"
+  say "building OpenSSH for WebAssembly (OpenSSL + OpenSSH, a few minutes the first time)"
+  docker build --target out --output "type=local,dest=$ROOT/build/ssh" "$ROOT/docker/ssh-wasm" || die "the SSH client did not build"
+  say "done: build/ssh/ssh.js + ssh.wasm"
+}
+
 cmd_runtime_build() {
+  [ -f "$ROOT/build/ssh/ssh.wasm" ] || cmd_ssh_build
   [ -f "$ENGINE_DIR/php-web.mjs" ] && [ -f "$ENGINE_DIR/php-web.wasm" ] || die "no engine in build/engine: bin/jumphp engine:download (or engine:build) first"
   php_run . -- sh /workspace/tools/build-runtime.sh
   mkdir -p "$ROOT/.build"
@@ -1196,6 +1206,14 @@ cmd_run() {
       flags+=(-e MESA_LOADER_DRIVER_OVERRIDE=zink)
     fi
   fi
+  # NVIDIA's own driver (not nouveau) lives on the host: Docker's NVIDIA container toolkit injects its GL / EGL libraries into the container
+  if [ -e /dev/nvidiactl ]; then
+    if docker info 2>/dev/null | grep -qi 'runtimes:.*nvidia'; then
+      flags+=(--gpus all -e NVIDIA_DRIVER_CAPABILITIES=all -e __GLX_VENDOR_LIBRARY_NAME=nvidia)
+    else
+      warn "NVIDIA GPU without the NVIDIA container toolkit: drawn by the CPU. Install nvidia-container-toolkit (nvidia-ctk runtime configure --runtime=docker) for the GPU."
+    fi
+  fi
   if is_hybrid "${1:-}"; then run_game_hybrid "$dir" "${flags[@]}"; return; fi
   php_run "$dir" "${flags[@]}" -- php app.php
 }
@@ -1664,6 +1682,7 @@ main() {
     engine:download) cmd_engine_download "$@" ;;
     engine:pack) cmd_engine_pack ;;
     runtime:build) cmd_runtime_build ;;
+    ssh:build) cmd_ssh_build ;;
     runtime:download) cmd_runtime_download "$@" ;;
     setup) cmd_setup "$@" ;;
     engine:build) cmd_engine_build "$@" ;;

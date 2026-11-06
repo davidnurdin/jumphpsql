@@ -427,8 +427,9 @@ abstract class Form extends AbstractScene
         $p->right = $mouse->isPressed(3);
         $p->wheel = $mouse->wheelY;
         $mods = (int)\SDL_GetModState();
-        $p->shift = ($mods & 3) !== 0;
-        $p->ctrl = ($mods & (192 | 3072)) !== 0;
+        // the keys' own state too: the binding's modifier state is empty in some places, and a quick tap is over before the frame reads it
+        $p->shift = ($mods & 3) !== 0 || $keyboard->shiftHeld() || $keyboard->typedWithShift();
+        $p->ctrl = ($mods & (192 | 3072)) !== 0 || $keyboard->ctrlHeld() || $keyboard->typedWithCtrl();
         $caps = ($mods & 8192) !== 0;
         $typed = $keyboard->getTyped();
         // held keys repeat (the keyboard only reports the first press)
