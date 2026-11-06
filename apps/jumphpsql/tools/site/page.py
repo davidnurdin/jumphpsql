@@ -43,7 +43,7 @@ T = {
             ('dark', 'Le thème sombre'),
         ],
         'tech_h': 'Du PHP, de bout en bout',
-        'tech': 'jumphpsql est fait avec <a href="https://jumphp.net">JumPHP</a> : la fenêtre, les boutons, la grille de données et '
+        'tech': 'jumphpsql est fait avec <a href="https://jumphp.net" target="_blank" rel="noopener">JumPHP</a> : la fenêtre, les boutons, la grille de données et '
                 'l’éditeur sont dessinés par PHP (JumPHP\\Gui, sans HTML). Le client MySQL est écrit en PHP lui aussi, non bloquant : '
                 'les requêtes partent en file, les réponses arrivent entre deux images. Compatible MySQL 5.7 / 8.x et MariaDB '
                 '(mysql_native_password, caching_sha2_password, client_ed25519).',
@@ -91,7 +91,7 @@ T = {
             ('dark', 'The dark theme'),
         ],
         'tech_h': 'PHP, all the way down',
-        'tech': 'jumphpsql is made with <a href="https://jumphp.net">JumPHP</a>: the window, the buttons, the data grid and the '
+        'tech': 'jumphpsql is made with <a href="https://jumphp.net" target="_blank" rel="noopener">JumPHP</a>: the window, the buttons, the data grid and the '
                 'editor are drawn by PHP (JumPHP\\Gui, no HTML). The MySQL client is written in PHP too, non-blocking: queries are '
                 'queued, answers arrive between two frames. Works with MySQL 5.7 / 8.x and MariaDB (mysql_native_password, '
                 'caching_sha2_password, client_ed25519).',
@@ -218,7 +218,7 @@ def page(lang: str) -> str:
           <p class="tagline">{e(t['tagline'])}</p>
           <p class="lead">{e(t['lead'])}</p>
           <div class="cta">
-            <a class="btn primary" href="{REPO}">{e(t['source'])}</a>
+            <a class="btn primary" href="{REPO}" target="_blank" rel="noopener">{e(t['source'])}</a>
             <a class="btn ghost" href="{up}play/">▶ {e(t['preview'])}</a>
           </div>
           <p class="note">{e(t['preview_note'])}</p>
@@ -254,10 +254,10 @@ bin/jumphp run jumphpsql</code></pre>
     <section>
       <h2>{e(t['faq_h'])}</h2>
 {faq}
-      <p class="again"><a class="btn primary" href="{REPO}">{e(t['source'])}</a></p>
+      <p class="again"><a class="btn primary" href="{REPO}" target="_blank" rel="noopener">{e(t['source'])}</a></p>
     </section>
   </main>
-  <footer><div class="wrap">{e(t['footer'])} · <a href="{REPO}">GitHub</a> · <a href="{up}play/">{e(t['preview'])}</a></div></footer>
+  <footer><div class="wrap">{e(t['footer'])} · <a href="{REPO}" target="_blank" rel="noopener">GitHub</a> · <a href="{up}play/">{e(t['preview'])}</a></div></footer>
 </body>
 </html>
 '''
