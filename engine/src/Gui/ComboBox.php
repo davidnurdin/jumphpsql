@@ -12,7 +12,7 @@ use JumPHP\Renderer\Renderer;
  * @property list<string> $items
  * @property int $selected
  */
-class ComboBox extends Widget
+class ComboBox extends Widget implements Overlay
 {
     public const DEFAULTS = ['items' => [], 'selected' => -1, 'placeholder' => 'Choose…', 'rows' => 8];
 

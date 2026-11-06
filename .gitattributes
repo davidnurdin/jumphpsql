@@ -1,0 +1,34 @@
+# Line endings: LF everywhere in the working tree, whatever the user's Git settings. Git for Windows' default (core.autocrlf=true) made
+# `bin/jumphp` and every tools/*.sh start with "bash\r" (a Linux shell, or WSL / Docker, cannot run them), and breaks PHP heredocs, YAML,
+# Dockerfiles and the files sent to containers.
+* text=auto eol=lf
+*.sh text eol=lf
+bin/* text eol=lf
+tools/* text eol=lf
+Dockerfile* text eol=lf
+*.php text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+# binaries: never touched
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.wav binary
+*.ogg binary
+*.mp3 binary
+*.mp4 binary
+*.zip binary
+*.gz binary
+*.phar binary
+*.wasm binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.exe binary

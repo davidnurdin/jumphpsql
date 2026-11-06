@@ -61,6 +61,9 @@ final class Ide
     /** The detailed logs (the Logs window): set by the desktop app, which owns them across projects */
     public ?\JumPHP\Ide\Log\LogBuffer $log = null;
 
+    /** @var array<int, string> run id => the end of what the program printed (kept for the Logs window, source "run") */
+    private array $runOutput = [];
+
     /** the IDE's tools for that Claude (an MCP server; the interface carries them out) */
     public ?IdeAgent $agent = null;
 
@@ -105,7 +108,10 @@ final class Ide
             }
             $this->index->addStubs(...array_keys($stubs));
             $this->git = new Git($this->processes, $root);
-            $this->runner = new Runner($this->processes, $root, fn (string $event, array $payload) => ($this->emit)($event, $payload));
+            $this->runner = new Runner($this->processes, $root, function (string $event, array $payload): void {
+                $this->logRun($event, $payload);
+                ($this->emit)($event, $payload);
+            });
         }
         $this->registerCore();
         $this->registerForms();
@@ -154,6 +160,10 @@ final class Ide
                 isset($p['effort']) && $p['effort'] !== '' ? (string)$p['effort'] : null, true, (string)($p['conv'] ?? 'main') ?: 'main',
                 ($p['agent'] ?? '') === 'opencode' ? 'opencode' : 'claude'));
             $this->register('claude.stop', fn (array $p) => $this->claude->stop((int)($p['id'] ?? 0)));
+            // "Open in a Terminal": the standard claude / opencode program in the desktop's terminal, resuming the conversation
+            $this->register('claude.terminal', fn (array $p) => (new \JumPHP\Ide\Claude\ExternalTerminal($root))->open(
+                ($p['agent'] ?? '') === 'opencode' ? 'opencode' : 'claude', isset($p['session']) && $p['session'] !== '' ? (string)$p['session'] : null,
+                isset($p['model']) && $p['model'] !== '' ? (string)$p['model'] : null, (string)($p['mode'] ?? 'acceptEdits')));
             // "Generate…" in the resource editors: Claude (claude -p), or a picture service with the user's key
             $ai = new ResourceGenerator($this->processes, $root);
             $this->register('ai.providers', fn () => $ai->providers());
@@ -702,5 +712,20 @@ final class Ide
         });
         $this->register('run.stop', fn (array $p) => $runner->stop((int)$p['id']));
         $this->register('run.list', fn () => $runner->running());
+    }
+    /** The Logs window sees what a run printed (its last lines) and how it ended, as the source "run". */
+    private function logRun(string $event, array $payload): void
+    {
+        $id = (int)($payload['id'] ?? 0);
+        if ($event === 'run.output') {
+            $this->runOutput[$id] = mb_substr(($this->runOutput[$id] ?? '') . (string)($payload['chunk'] ?? ''), -4000);
+        } elseif ($event === 'run.exit') {
+            $out = trim((string)preg_replace('/\e\[[0-9;?]*[A-Za-z]/', '', $this->runOutput[$id] ?? ''));
+            unset($this->runOutput[$id]);
+            $code = (int)($payload['code'] ?? 0);
+            $label = (string)($payload['label'] ?? 'run');
+            $this->log?->add($code === 0 ? 'info' : 'error', 'run', "$label ended with code $code" . (isset($payload['seconds']) ? " after {$payload['seconds']} s" : '')
+                . ($out !== '' ? ":\n" . mb_substr($out, -1500) : ''));
+        }
     }
 }

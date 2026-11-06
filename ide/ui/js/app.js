@@ -2,7 +2,7 @@
 // the page), lays out the tool windows (Project, Commit, Structure / Run, Find, Problems, Git), and binds PhpStorm's
 // keyboard shortcuts to the IDE's actions.
 import { backend } from './backend.js';
-import { el, clear, icon, hydrateIcons, progressBar, menu, chooser, dialog, copyText, languageSelect, notify, notificationHistory, splitter, prefs, debounce, kbd, basename, timeAgo } from './ui.js';
+import { t, el, clear, icon, hydrateIcons, progressBar, menu, chooser, dialog, confirm, copyText, languageSelect, notify, notificationHistory, splitter, prefs, debounce, kbd, basename, timeAgo } from './ui.js';
 import { Editors, loadMonaco, monaco } from './editor.js';
 import { ProjectTree } from './tree.js';
 import { Plugins } from './plugins.js';
@@ -172,6 +172,11 @@ class App {
       notify('This project is on this computer only. Publish (or “Create its GitHub repository”) puts it on your GitHub account and on jumphp.net when you want.', 'info',
         { title: 'Local project', timeout: 0, actions: [{ label: 'Create its GitHub repository…', action: () => this.createRepository() }, { label: 'Later', action: () => null }] });
     }
+    if (backend.kind === 'native' && info.needsPlayground && !prefs.get('playgroundHint:' + this.projectKey, false)) {
+      prefs.set('playgroundHint:' + this.projectKey, true);
+      notify('This project is on GitHub but not on jumphp.net: there is nothing to publish from here yet.', 'info',
+        { title: 'jumphp.net', timeout: 0, actions: [{ label: 'Put it on jumphp.net…', action: () => this.putOnPlayground() }, { label: 'Later', action: () => null }] });
+    }
     setInterval(() => { if (document.visibilityState === 'visible') this.git.refresh(); }, 15000);
     window.addEventListener('focus', () => { this.git.refresh(); this.editors.reloadFromDisk(); this.tree.refresh(); });
     window.addEventListener('beforeunload', () => this.saveTabs());
@@ -220,7 +225,7 @@ class App {
     clear(left);
     clear(right);
     const button = (tool) => {
-      const b = el('button', { title: `${tool.label} (${kbd(tool.key)})`, dataset: { tool: tool.id }, onclick: () => this.toggleTool(tool.id) }, icon(tool.icon));
+      const b = el('button', { title: `${t(tool.label)} (${kbd(tool.key)})`, dataset: { tool: tool.id }, onclick: () => this.toggleTool(tool.id) }, icon(tool.icon));
       tool.button = b;
       b.classList.toggle('on', this.open?.[tool.side] === tool.id);
       return b;
@@ -270,7 +275,7 @@ class App {
     if (id === 'commit') {
       panel.append(node);
     } else {
-      tool.header = el('div.tw-header', {}, el('span.tw-title', {}, typeof view.title === 'function' ? view.title() : tool.label),
+      tool.header = el('div.tw-header', {}, el('span.tw-title', {}, typeof view.title === 'function' ? view.title() : t(tool.label)),
         view.headerExtra ? view.headerExtra() : null, el('span.tw-spacer'), el('div.tw-actions', {}, ...(view.actions ? view.actions() : []),
           el('button', { title: 'Hide', onclick: () => this.closeSide(tool.side) }, icon('minus'))));
       panel.append(tool.header, el('div.tw-body', {}, node));
@@ -349,7 +354,7 @@ class App {
     $('debugBtn').hidden = !this.debugger;
     $('stopBtn').hidden = !caps.run;
     $('previewBtn').hidden = !caps.preview;
-    $('publishBtn').hidden = !(backend.kind === 'native' && this.project.playground);
+    $('publishBtn').hidden = !(backend.kind === 'native' && (this.project.playground || this.project.needsPlayground || this.project.needsRepository));
     // a project shared with read rights only (the web IDE): said in the status bar, the files open read-only
     let mark = $('sbReadOnly');
     if (caps.readOnly && !mark) {
@@ -945,11 +950,49 @@ class App {
   async publish() {
     if (this.project.extension) { this.publishExtension(); return; }
     if (this.project.needsRepository) { this.createRepository(); return; }
+    if (this.project.needsPlayground) { this.putOnPlayground(); return; }
     const done = this.task('Publishing on jumphp.net…');
     try {
       const result = await backend.invoke('playground.publish');
       notify(result.message || 'Published', result.ok === false ? 'error' : 'success', { title: 'jumphp.net', actions: result.url ? [{ label: 'Open its page', action: () => this.openUrl(result.url) }] : [] });
-    } catch (e) { notify(e.message, 'error', { title: 'Publish' }); } finally { done(); }
+    } catch (e) { this.githubError(e, 'Publish', () => this.publish()); } finally { done(); }
+  }
+
+  /**
+   * The project has its own GitHub repository but jumphp.net does not know it: it is imported there (not listed), then Publish works.
+   * (The repository made by "Create its GitHub repository" or by hand, without the import, left nothing to publish from the IDE.)
+   */
+  async putOnPlayground() {
+    if (!(await confirm('Put it on jumphp.net?', `This project is on GitHub (${this.project.repository}) but not on jumphp.net yet. jumphp.net takes the repository (not listed in the directory until you say so) and Publish works from then on.`, { ok: 'Put it on jumphp.net' }))) return;
+    const done = this.task('Putting the project on jumphp.net…');
+    try {
+      const r = await backend.invoke('project.putOnPlayground');
+      notify(`On jumphp.net as “${r.playground}”. Publish it now to make it playable.`, 'success', { title: 'jumphp.net', timeout: 0,
+        actions: [{ label: 'Reload the project', action: () => location.reload() }] });
+      setTimeout(() => location.reload(), 2500);
+    } catch (e) { this.githubError(e, 'jumphp.net', () => this.putOnPlayground()); } finally { done(); }
+  }
+
+  /**
+   * An error of jumphp.net / GitHub as a notification with buttons: the ones the server attached (`e.actions`: login = sign in again then `retry`,
+   * retry, open = a url), else "Sign in again" when the message is about a refused token / an ended session.
+   */
+  githubError(e, title, retry) {
+    let actions = Array.isArray(e.actions) ? e.actions : [];
+    if (!actions.length && /bad credentials|refuses the saved token|refused the token saved|sign in again|session has ended|sign in with jumphp\.net first/i.test(e.message)) {
+      actions = [{ action: 'login', label: 'Sign in again' }];
+    }
+    const buttons = actions.map((a) => ({ label: a.label || a.action, action: () => {
+      if (a.action === 'login') {
+        return backend.invoke('session.login', { another: false })
+          .then(() => { notify('Signed in again.', 'success', { title }); retry(); })
+          .catch((err) => !/cancel/i.test(err.message) && notify(err.message, 'error', { title: 'Sign in' }));
+      }
+      if (a.action === 'open' && a.url) return this.openUrl(a.url);
+      if (a.action === 'retry') return retry();
+      return null;
+    } }));
+    notify(e.message, 'error', { title, timeout: buttons.length || title !== 'Publish' ? 0 : undefined, actions: buttons });
   }
 
   /** Its own public repository on the user's GitHub account, everything committed and pushed, then a jumphp.net project. */
@@ -969,7 +1012,7 @@ class App {
             { title: 'GitHub', timeout: 0, actions: [{ label: 'Open the repository', action: () => this.openUrl(r.url) }, { label: 'Reload the project', action: () => location.reload() }] });
         } catch (e) {
           // GitHub refused the token jumphp.net kept (revoked / expired): sign in again, then the same dialog
-          if (/bad credentials|refuses the saved token|refused the token saved/i.test(e.message)) {
+          if (/bad credentials|refuses the saved token|refused the token saved|sign in again|session has ended|sign in with jumphp\.net first/i.test(e.message)) {
             notify(e.message, 'error', { title: 'GitHub', timeout: 0, actions: [{ label: 'Sign in again', action: () => backend.invoke('session.login', { another: false })
               .then(() => { notify('Signed in again.', 'success', { title: 'GitHub' }); this.createRepository(); })
               .catch((err) => !/cancel/i.test(err.message) && notify(err.message, 'error', { title: 'Sign in' })) }] });

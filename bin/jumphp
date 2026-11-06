@@ -27,15 +27,36 @@ if [ -n "${MSYSTEM:-}" ] && command -v cygpath >/dev/null 2>&1; then
     fi
     command docker "${args[@]}"
   }
-  # curl is a Windows program there: the files it writes (mktemp's /tmp/...) as Windows paths
+  # curl is a Windows program there: the files it writes (mktemp's /tmp/...) as Windows paths. Only the argument that
+  # follows an output option (-o, --output, -D, --dump-header, -c, --cookie-jar) is a file: a URL path or a value given to
+  # another option (--data /x) is never touched
   curl() {
-    local args=() a
+    local args=() a file=0
     for a in "$@"; do
-      if [[ "$a" == /* && -d "$(dirname "$a")" ]]; then args+=("$(cygpath -m "$a")"); else args+=("$a"); fi
+      if [ "$file" = 1 ]; then
+        file=0
+        if [[ "$a" == /* && -d "$(dirname "$a")" ]]; then a="$(cygpath -m "$a")"; fi
+      else
+        case "$a" in
+          -o|--output|-D|--dump-header|-c|--cookie-jar) file=1 ;;
+          --output=/*|--dump-header=/*|--cookie-jar=/*)
+            if [[ -d "$(dirname "${a#*=}")" ]]; then a="${a%%=*}=$(cygpath -m "${a#*=}")"; fi ;;
+        esac
+      fi
+      args+=("$a")
     done
     command curl "${args[@]}"
   }
 fi
+# The images are built with BuildKit (`docker build --build-context`): a Docker Engine installed from Ubuntu's own packages (docker.io, the usual
+# one inside WSL) has no buildx and fails with "unknown flag: --build-context": say what to install instead
+need_buildx() {
+  docker buildx version >/dev/null 2>&1 && return 0
+  echo "[x] This Docker has no buildx, which the images need (docker build --build-context)." >&2
+  echo "    Docker Desktop has it. A Docker Engine from Ubuntu needs: sudo apt install docker-buildx" >&2
+  echo "    (or Docker's own repository: docker-ce + docker-buildx-plugin). See docs/windows-wsl.md." >&2
+  exit 1
+}
 [ -f .env ] && set -a && . ./.env && set +a
 # JUMPHP_APP is the new name of JUMPHP_GAME (both read; the project a command means when none is named)
 JUMPHP_GAME="${JUMPHP_APP:-${JUMPHP_GAME:-}}"
@@ -44,6 +65,7 @@ JUMPHP_GAME="${JUMPHP_APP:-${JUMPHP_GAME:-}}"
 if jumphp_wsl_wanted; then jumphp_wsl_exec "$(pwd -W 2>/dev/null || pwd)" "$(cd "$CALLER_DIR" && { pwd -W 2>/dev/null || pwd; })" "$@"; fi
 
 DESKTOP_IMAGE="${JUMPHP_DESKTOP_IMAGE:-jumphp/desktop:dev}"
+DESKTOP_REV=4     # the runtime image's revision (docker/desktop/Dockerfile LABEL jumphp.rev): a changed one rebuilds it (2: xclip / wl-clipboard, the apps' copy and paste; 3: Mesa 25 from backports, 4: + Vulkan drivers: recent GPUs instead of llvmpipe)
 XDEBUG_IMAGE="${JUMPHP_XDEBUG_IMAGE:-jumphp/desktop-xdebug:dev}"
 # runtime "async" (game.yaml `runtime: async`): PHP 8.6 ZTS + TrueAsync (threads, coroutines)
 ASYNC_IMAGE="${JUMPHP_ASYNC_IMAGE:-jumphp/desktop-async:dev}"
@@ -276,16 +298,8 @@ project_runtime() {
 
 runtime_image() { [ "$(project_runtime "$1")" = async ] && echo "$ASYNC_IMAGE" || echo "$DESKTOP_IMAGE"; }
 
-# the revision of docker/desktop (its LABEL org.jumphp.desktop.rev): an older image is built again (2: openssh-client)
-DESKTOP_REV=2
 ensure_desktop_image() {
-  local rev
-  rev=$(docker image inspect -f '{{index .Config.Labels "org.jumphp.desktop.rev"}}' "$DESKTOP_IMAGE" 2>/dev/null) \
-    || { say "building $DESKTOP_IMAGE (first time, ~3 min)"; docker build -t "$DESKTOP_IMAGE" --build-context ext=docker/ext docker/desktop; return; }
-  if [ "${rev:-1}" != "$DESKTOP_REV" ]; then
-    say "updating $DESKTOP_IMAGE (revision ${rev:-1} -> $DESKTOP_REV)"
-    docker build -t "$DESKTOP_IMAGE" --build-context ext=docker/ext docker/desktop
-  fi
+  [ "$(docker image inspect -f '{{index .Config.Labels "jumphp.rev"}}' "$DESKTOP_IMAGE" 2>/dev/null)" = "$DESKTOP_REV" ] || { need_buildx; say "building $DESKTOP_IMAGE (the first time, or a newer runtime: ~3 min)"; docker build -t "$DESKTOP_IMAGE" --build-context ext=docker/ext docker/desktop; }
 }
 
 # JUMPHP_LIVE=1: the headless runs write their current frame to var/live/frame.png (the Claude Code pane
@@ -336,7 +350,7 @@ php_run() {
   local debug="${JUMPHP_XDEBUG:-}"
   case " $* " in *" composer "*|*phpstan*|*"php -l"*) debug= ;; esac
   if [ "$image" = "$ASYNC_IMAGE" ]; then
-    docker image inspect "$ASYNC_IMAGE" >/dev/null 2>&1 || { say "building $ASYNC_IMAGE (PHP 8.6 ZTS + TrueAsync, first time ~15 min)"; docker build -t "$ASYNC_IMAGE" --build-context ext=docker/ext docker/desktop-async; }
+    docker image inspect "$ASYNC_IMAGE" >/dev/null 2>&1 || { need_buildx; say "building $ASYNC_IMAGE (PHP 8.6 ZTS + TrueAsync, first time ~15 min)"; docker build -t "$ASYNC_IMAGE" --build-context ext=docker/ext docker/desktop-async; }
   else
     ensure_desktop_image
   fi
@@ -409,11 +423,13 @@ ensure_engine_tools() {
 
 cmd_setup() {
   say "desktop runtime image ($DESKTOP_IMAGE)"
+  need_buildx
   docker build -t "$DESKTOP_IMAGE" --build-context ext=docker/ext docker/desktop
   say "relay server image"
   docker compose build relay
   if [ "${1:-}" = async ]; then
     say "async runtime image ($ASYNC_IMAGE: PHP 8.6 ZTS + TrueAsync, ~15 min)"
+    need_buildx
     docker build -t "$ASYNC_IMAGE" --build-context ext=docker/ext docker/desktop-async
   fi
   say "done. Next: bin/jumphp engine:build (browser engine), bin/jumphp run pong"
@@ -1170,11 +1186,15 @@ cmd_run() {
       local gid; gid="$(getent group "$grp" | cut -d: -f3 || true)"
       [ -n "$gid" ] && flags+=(--group-add "$gid")
     done
-  fi
-  # project.yaml `ssh: true` (an app that opens SSH tunnels with the system's ssh): the user's agent and ~/.ssh (read only)
-  if grep -qE '^[[:space:]]*ssh:[[:space:]]*true' "$(project_yaml "$ROOT/$dir")" 2>/dev/null; then
-    [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "$SSH_AUTH_SOCK" ] && flags+=(-v "$SSH_AUTH_SOCK:/tmp/ssh-agent.sock" -e SSH_AUTH_SOCK=/tmp/ssh-agent.sock)
-    [ -d "$HOME/.ssh" ] && flags+=(-v "$HOME/.ssh:/tmp/.ssh:ro")
+    # A recent AMD GPU (RDNA 3.5: Strix Halo / Strix Point, gfx1150 and above) is unknown to the image's LLVM 15: radeonsi bails out and the
+    # window is drawn by the CPU (a big window lags). OpenGL over Vulkan (zink + RADV, no LLVM) uses the GPU: ~60 -> ~100 fps seen on gfx1151.
+    # JUMPHP_MESA_DRIVER=<driver> forces another driver (radeonsi, iris, llvmpipe...), also in .env.
+    local gfx; gfx="$(cat /sys/class/kfd/kfd/topology/nodes/*/properties 2>/dev/null | sed -n 's/^gfx_target_version //p' | sort -n | tail -1)"
+    if [ -n "${JUMPHP_MESA_DRIVER:-}" ]; then
+      flags+=(-e "MESA_LOADER_DRIVER_OVERRIDE=$JUMPHP_MESA_DRIVER")
+    elif [ "${gfx:-0}" -ge 110500 ] 2>/dev/null; then
+      flags+=(-e MESA_LOADER_DRIVER_OVERRIDE=zink)
+    fi
   fi
   if is_hybrid "${1:-}"; then run_game_hybrid "$dir" "${flags[@]}"; return; fi
   php_run "$dir" "${flags[@]}" -- php app.php
@@ -1196,13 +1216,13 @@ cmd_test() {
   local dir; dir="$(project_dir "$target")"
   ensure_vendor "$dir"
   live_announce
-  # one test file (the IDE's Play on a test): only its PHPUnit tests
+  # one test file (the IDE's Play on a test): only its PHPUnit tests; a third argument = one test method (--filter)
   if [ -n "${2:-}" ]; then
     local only="${2#"$dir"/}"
     [ -f "$ROOT/$dir/$only" ] || die "no test file $dir/$only"
     ensure_engine_tools
     say "$dir: phpunit $only"
-    php_run "$dir" -e SDL_VIDEODRIVER=dummy -e SDL_AUDIODRIVER=dummy -- /workspace/engine/vendor/bin/phpunit --bootstrap vendor/autoload.php --testdox "$only"
+    php_run "$dir" -e SDL_VIDEODRIVER=dummy -e SDL_AUDIODRIVER=dummy -- /workspace/engine/vendor/bin/phpunit --bootstrap vendor/autoload.php --testdox ${3:+--filter "$3"} "$only"
     return
   fi
   [ -d "$ROOT/$dir/tests" ] && ensure_engine_tools

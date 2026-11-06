@@ -206,6 +206,11 @@ abstract class Form extends AbstractScene
         $this->overlay = $widget;
     }
 
+    public function viewWidth(): float
+    {
+        return $this->width;
+    }
+
     public function viewHeight(): float
     {
         return $this->height;
@@ -252,6 +257,30 @@ abstract class Form extends AbstractScene
     }
 
     /** The scale of the theme: the screen's density (HiDPI, phones) times the app's zoom (`zoom` in the form file). */
+    private static ?float $systemScale = null;
+
+    /** The interface scale the user's system asks for (1 when it says nothing), read once. */
+    private static function systemScale(): float
+    {
+        if (self::$systemScale !== null) {
+            return self::$systemScale;
+        }
+        $scale = (float)(getenv('JUMPHP_GUI_SCALE') ?: 0);
+        if ($scale <= 0 && PHP_OS_FAMILY === 'Linux' && !\JumPHP\Kernel\Platform::isWasm() && getenv('DISPLAY') && function_exists('shell_exec')) {
+            $scale = self::scaleFromXrdb((string)@shell_exec('xrdb -query 2>/dev/null'));
+        }
+        if ($scale <= 0 && getenv('GDK_SCALE')) {
+            $scale = (float)getenv('GDK_SCALE') * (float)(getenv('GDK_DPI_SCALE') ?: 1);
+        }
+        return self::$systemScale = $scale > 0 ? max(1.0, min(4.0, round($scale * 4) / 4)) : 1.0;
+    }
+
+    /** "Xft.dpi: 144" in the output of `xrdb -query` -> 1.5 (96 dpi is 1), 0 when it is not there. */
+    public static function scaleFromXrdb(string $xrdb): float
+    {
+        return preg_match('/^Xft\.dpi:\s*([0-9.]+)/m', $xrdb, $m) ? (float)$m[1] / 96 : 0.0;
+    }
+
     private function updateScale(): void
     {
         if (!isset($this->engine)) {
@@ -266,6 +295,11 @@ abstract class Form extends AbstractScene
             [$ow] = $this->engine->sdl->getRenderer()->outputSize();
             if ($ww > 0 && $ow > 0) {
                 $density = $ow / $ww;
+            }
+            // X11 and Windows do not report a HiDPI screen as a density: the user's own setting (Xft.dpi, GDK_SCALE, JUMPHP_GUI_SCALE) says how
+            // big the interface should be, so it is drawn at the screen's real pixels (sharp) instead of tiny, or stretched by the desktop (blurred)
+            if ($density < 1.05) {
+                $density *= self::systemScale();
             }
         } elseif ($window === null && $this->engine->config->get('view') === 'window') {
             // headless (tests, screenshots): a surface twice the window's size, as a HiDPI screen
@@ -390,6 +424,7 @@ abstract class Form extends AbstractScene
         $p->down = $mouse->isPressed(1);
         $p->up = $mouse->isReleased(1);
         $p->held = $mouse->isHeld(1);
+        $p->right = $mouse->isPressed(3);
         $p->wheel = $mouse->wheelY;
         $mods = (int)\SDL_GetModState();
         $p->shift = ($mods & 3) !== 0;
@@ -467,15 +502,22 @@ abstract class Form extends AbstractScene
                 $target->hovered = true;
             }
         }
-        if ($this->overlay instanceof ComboBox && $target === $this->overlay && !$p->held) {
+        if ($this->overlay instanceof Overlay && $target === $this->overlay && !$p->held) {
             $this->overlay->hoverAt($this->local($p, $this->overlay)->y);
         }
 
+        if ($p->right && $target instanceof Overlay && method_exists($target, 'openMenu') && $target->isEnabled()) {
+            if ($this->overlay instanceof Overlay && $this->overlay !== $target) {
+                $this->overlay->close();
+            }
+            $this->setFocus($target);
+            $target->openMenu($p->x, $p->y);
+        }
         if ($p->down) {
             $this->doubleArmed = $this->clock - $this->lastDown[0] < 0.4 && abs($p->x - $this->lastDown[1]) < 8 && abs($p->y - $this->lastDown[2]) < 8;
             $this->lastDown = [$this->clock, $p->x, $p->y];
             $this->pressFrom = [$p->x, $p->y];
-            if ($this->overlay !== null && $target !== $this->overlay && $this->overlay instanceof ComboBox) {
+            if ($this->overlay !== null && $target !== $this->overlay && $this->overlay instanceof Overlay) {
                 $this->overlay->close();
             }
             $this->pressedWidget = $target;
@@ -589,27 +631,6 @@ abstract class Form extends AbstractScene
     {
         if ($p->keys === [] && $p->text === []) {
             return;
-        }
-        if ($p->ctrl && $this->focus instanceof TextBox) {
-            $box = $this->focus;
-            if (in_array(ord('v'), $p->keys, true)) {
-                try {
-                    Clipboard::paste()->then(function (mixed $text) use ($box): void {
-                        $insert = new Pointer();
-                        $insert->text = mb_str_split(str_replace(["\r\n", "\r"], "\n", (string)$text)) ?: [];
-                        $box->keys($insert);
-                    });
-                } catch (\Throwable) {
-                }
-                return;
-            }
-            if (in_array(ord('c'), $p->keys, true) && !$box->props['password']) {
-                try {
-                    Clipboard::copy((string)$box->props['text']);
-                } catch (\Throwable) {
-                }
-                return;
-            }
         }
         $used = $this->focus?->keys($p) ?? false;
         if ($used) {

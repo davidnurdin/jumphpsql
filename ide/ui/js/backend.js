@@ -17,13 +17,22 @@ function dispatch(event, payload) {
 
 const native = typeof window.jumphp !== 'undefined' && window.jumphp.native;
 
+/** An error message may end with "[[actions:[...]]]": the buttons jumphp.net attached to its error; they go to `error.actions`. */
+function withActions(e) {
+  const m = /\n?\[\[actions:(\[.*\])\]\]\s*$/s.exec(String(e?.message ?? e));
+  if (!m) return e instanceof Error ? e : new Error(String(e));
+  const error = new Error(String(e.message).slice(0, m.index));
+  try { error.actions = JSON.parse(m[1]); } catch { /* no buttons */ }
+  return error;
+}
+
 export const backend = {
   kind: native ? 'native' : 'web',
   config,
 
   async invoke(name, payload = {}) {
     if (native) {
-      return window.jumphp.invoke('ide', { name, payload });
+      try { return await window.jumphp.invoke('ide', { name, payload }); } catch (e) { throw withActions(e); }
     }
     const response = await fetch(`${config.api}/invoke`, {
       method: 'POST',

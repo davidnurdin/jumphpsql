@@ -20,6 +20,7 @@ use JumPHP\Input\ActionMap;
 use JumPHP\Input\InputManager;
 use JumPHP\Loop\GameLoop;
 use JumPHP\Net\NetSession;
+use JumPHP\Net\Tcp;
 use JumPHP\Renderer\BitmapFont;
 use JumPHP\Renderer\Renderer;
 use JumPHP\Renderer\Sdl;
@@ -52,6 +53,7 @@ class Engine extends EventEmitter
     private ?TextDrawer $font = null;
     private ?Extensions $extensions = null;
     private ?NetSession $net = null;
+    private ?Tcp $tcp = null;
     private ?Tasks $tasks = null;
     private ?Http $http = null;
     private ?WebGl $gl = null;
@@ -211,6 +213,7 @@ class Engine extends EventEmitter
         if ($this->net !== null && $this->net->isActive()) {
             $this->net->poll();
         }
+        $this->tcp?->poll();
         $this->sound->update();
         $this->audio3d?->sync();
         $this->tasks?->poll();
@@ -274,6 +277,7 @@ class Engine extends EventEmitter
         }
         $this->running = false;
         $this->net?->close();
+        $this->tcp?->closeAll();
         $this->tasks?->shutdown();
         $this->gameLoop->stop();
     }
@@ -286,6 +290,7 @@ class Engine extends EventEmitter
     {
         $this->running = false;
         $this->net?->close();
+        $this->tcp?->closeAll();
         $this->tasks?->shutdown();
         $this->closeAudio3d();
         $this->sound->close();
@@ -318,6 +323,15 @@ class Engine extends EventEmitter
     public function net(): NetSession
     {
         return $this->net ??= new NetSession($this->config);
+    }
+
+    /**
+     * TCP connections (a SQL client...): straight sockets on desktop; in the browser through the playground's TCP bridge,
+     * for an application the administrator approved (JumPHP\Net\Tcp). Polled each frame.
+     */
+    public function tcp(): Tcp
+    {
+        return $this->tcp ??= new Tcp($this->config, $this->http());
     }
 
     /** Background work: threads with the async runtime, between frames elsewhere (created on first use). */

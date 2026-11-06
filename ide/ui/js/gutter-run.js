@@ -8,6 +8,7 @@ import { menu, prompt, prefs, debounce } from './ui.js';
 
 const COMMAND = /#\[AsCommand\(\s*(?:name:\s*)?(['"])([^'"]+)\1/;
 const NAMESPACE = /^namespace\s+([^;\s]+)\s*;/;
+const TEST_METHOD = /^\s*(?:public\s+)?function\s+(test\w+)\s*\(/;
 const SCENE_CLASS = /^(?:final\s+)?class\s+(\w+)\s+extends\s+\\?(?:[\w\\]*\\)?(\w*Scene)\b/;
 
 /** "add 'two words' --done" -> ['add', 'two words', '--done'] (quotes group, no shell). */
@@ -68,6 +69,10 @@ export class GutterRun {
     if (this.moduleOf(path)) {
       model.getLinesContent().forEach((text, i) => { const m = COMMAND.exec(text); if (m) marks.push({ line: i + 1, name: m[2] }); });
     }
+    const tm = /^(?:games|apps)\/([^/]+)\/(tests\/.+Test\.php)$/.exec(path);
+    if (tm && this.app.runner) {
+      model.getLinesContent().forEach((text, i) => { const m = TEST_METHOD.exec(text); if (m) marks.push({ line: i + 1, name: m[1], test: { module: tm[1], file: tm[2] } }); });
+    }
     if (this.gameOf(path)) {
       const lines = model.getLinesContent();
       const ns = lines.map((l) => NAMESPACE.exec(l)).find(Boolean)?.[1];
@@ -79,7 +84,7 @@ export class GutterRun {
     this.marks.set(key, marks);
     this.decorations.set(key, model.deltaDecorations(this.decorations.get(key) || [], marks.map((m) => ({
       range: new monaco.Range(m.line, 1, m.line, 1),
-      options: { linesDecorationsClassName: 'run-gutter', linesDecorationsTooltip: m.scene ? `Run the scene ${m.name} (only this scene)` : `Run or debug the command ${m.name}` },
+      options: { linesDecorationsClassName: 'run-gutter', linesDecorationsTooltip: m.test ? `Run the test ${m.name} (only this one)` : m.scene ? `Run the scene ${m.name} (only this scene)` : `Run or debug the command ${m.name}` },
     }))));
   }
 
@@ -103,6 +108,11 @@ export class GutterRun {
 
   open(model, mark, at) {
     const path = pathOf(model.uri);
+    if (mark.test) {
+      const config = { id: 'adhoc', kind: 'test', label: mark.name, command: ['bin/jumphp', 'test', mark.test.module, mark.test.file, mark.name] };
+      menu([{ label: `Run '${mark.name}'`, icon: 'play', action: () => this.app.runner.start(config) }], at);
+      return;
+    }
     if (mark.scene) {
       const { config, env } = this.sceneConfig(model, mark);
       menu([

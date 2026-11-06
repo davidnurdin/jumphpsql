@@ -111,13 +111,25 @@ export class PublishPanel {
         this.render();
       } catch (e) { notify(e.message, 'error', { title: 'Settings' }); }
     };
+    // take the project offline (not playable, out of the directory, a push no longer publishes it, its published files are deleted) / publish it again
+    const online = p.status === 'ready';
+    const offline = el('button.btn', { title: online ? 'Not playable any more, out of the directory; a push does not publish it again until you do' : 'Publish the project again now',
+      onclick: async () => {
+        if (online && !(await confirm('Take it offline?', 'It is no longer playable nor in the directory, and its published files are deleted from jumphp.net. Your repository is untouched; you can publish it again.', { ok: 'Take offline', danger: true }))) return;
+        try {
+          this.data.project = await backend.invoke('playground.update', { settings: { published: !online } });
+          notify(online ? 'Taken offline.' : 'Published again.', 'success', { title: 'jumphp.net' });
+          this.render();
+        } catch (e) { notify(e.message, 'error', { title: 'jumphp.net' }); }
+      } }, online ? 'Take offline' : 'Publish again');
     b.append(
       el('label.field', {}, el('span', {}, 'Title'), title),
       el('label.field', {}, el('span', {}, 'Description (the directory, the page)'), description),
       el('label.field', {}, el('span', {}, 'Category'), category),
       el('label.field', {}, el('span', {}, 'Progress (shown on its page; “published” only says it is online)'), stage),
       el('label.pub-check', {}, listed, el('span', {}, 'Listed in the directory (else only people with the link see it)')),
-      el('div.pub-row', {}, el('button.btn.primary', { onclick: save }, 'Save'), this.link('More in Studio', (p.url || '').replace(/\/[^/]+$/, '') + '/studio/projet/' + p.slug)),
+      el('div.pub-row', {}, el('button.btn.primary', { onclick: save }, 'Save'), offline,
+        this.link('More in Studio', (p.url || '').replace(/\/[^/]+$/, '') + '/studio/projet/' + p.slug)),
     );
   }
 

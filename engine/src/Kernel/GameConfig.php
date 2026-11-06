@@ -28,6 +28,7 @@ final class GameConfig
         'start_params' => [],
         'lang' => 'en',
         'net_url' => 'ws://localhost:8090/ws',
+        'tcp_ticket_url' => 'https://jumphp.net/api/tcp/ticket',
         'debug_key' => 'F3',
         'fullscreen_key' => 'F11',
         'double_click_fullscreen' => true,  // browser: a double click on the game goes fullscreen (false: games clicked fast)
@@ -94,6 +95,12 @@ final class GameConfig
     public function height(): int { return (int)$this->values['height']; }
     public function title(): string { return (string)$this->values['title']; }
     public function id(): string { return (string)$this->values['id']; }
+
+    /** Where the browser asks for a TCP bridge ticket (JumPHP\Net\Tcp): JUMPHP_TCP_URL (env / page) wins over project.yaml. */
+    public function tcpTicketUrl(): string
+    {
+        return (string)Platform::setting('JUMPHP_TCP_URL', $this->values['tcp_ticket_url']);
+    }
 
     /** The relay server: JUMPHP_NET_URL (page ?net= / env) wins over game.yaml. */
     public function netUrl(): string

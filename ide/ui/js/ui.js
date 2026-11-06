@@ -192,7 +192,7 @@ export function menu(items, at) {
         },
       }, item.checked !== undefined ? el('span.check', {}, item.checked ? '✓' : '') : null,
       item.icon ? (typeof item.icon === 'string' ? icon(item.icon) : item.icon) : null,
-      el('span', {}, item.label), item.items ? el('span.sub') : null, item.kbd ? el('span.kbd', {}, item.kbd) : null);
+      el('span', {}, t(item.label)), item.items ? el('span.sub') : null, item.kbd ? el('span.kbd', {}, item.kbd) : null);
       container.append(row);
     }
   };
@@ -378,7 +378,7 @@ export function notify(text, kind = 'info', { title, actions = [], timeout } = {
   history.length = Math.min(history.length, 100);
   const toast = el(`div.toast.${kind}`, {}, el('div.t-body', {},
     title ? el('div.t-title', {}, title) : null, el('div.t-text', {}, text),
-    actions.length ? el('div.t-actions', {}, actions.map((a) => el('a', { onclick: () => { toast.remove(); a.action(); } }, a.label))) : null),
+    actions.length ? el('div.t-actions', {}, actions.map((a) => el('a', { onclick: () => { toast.remove(); a.action(); } }, t(a.label)))) : null),
   el('button.icon-btn', { onclick: () => toast.remove() }, icon('close')));
   box.append(toast);
   const ms = timeout ?? (kind === 'error' ? 12000 : 5000);

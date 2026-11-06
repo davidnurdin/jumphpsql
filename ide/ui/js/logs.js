@@ -114,6 +114,7 @@ export class LogsPanel {
   copyPath() {
     if (!this.file) { notify('This IDE does not keep a log file.', 'info', { title: 'Logs' }); return; }
     copyText(this.file);
-    notify(`${this.file} (copied). Send it with a bug report.`, 'info', { title: 'Logs' });
+    notify(`${this.file} (copied). Send it with a bug report.`, 'info', { title: 'Logs', actions: backend.kind === 'native'
+      ? [{ label: 'Show in the folder', action: () => backend.invoke('native.reveal', { path: this.file }).catch((e) => notify(e.message, 'error', { title: 'Logs' })) }] : [] });
   }
 }

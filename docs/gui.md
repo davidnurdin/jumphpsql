@@ -171,3 +171,24 @@ final class MainFormTest extends GameTestCase
 
 `click($widget, $double)`, `clickAt($x, $y)`, `type($text)`, `key(Pointer::DOWN)`. A form also lays out without
 SDL (`new MainForm()`, `build($definition)`, `layoutTo($w, $h)`): plain PHPUnit tests of a layout.
+
+## Text fields: selection, words, clipboard, right click
+
+A `textbox` works like the system's: Shift + arrows / Home / End select, Ctrl + arrows jump by words (Ctrl + Shift: select words), Ctrl + Backspace / Ctrl + Delete delete
+the word before / after the cursor, Ctrl + A selects everything, Ctrl + C / X / V copy, cut, paste (Shift + Delete cuts), a double click selects the word, a
+drag selects, and a **right click** opens a small menu (Cut, Copy, Paste, Select all). A password is never copied. Typing replaces the selection.
+The clipboard is the system's: on Linux it uses `wl-copy` / `wl-paste` or `xclip` (or `xsel`) (they are in the Docker runtime image of `bin/jumphp run`; an
+exported Linux executable needs one of them installed), `pbcopy` / `pbpaste` on macOS, PowerShell on Windows, the browser's clipboard on the web.
+A widget of your own with a context menu uses the trait `JumPHP\Gui\HasContextMenu` (rows: `menuItems()`, what they do: `runMenu()`).
+
+## The interface's size follows the screen
+
+On a HiDPI screen (a density above 1) the forms scale by themselves; on X11 and Windows, which do not report one, the scale of the desktop's own setting is used
+(`Xft.dpi`, `GDK_SCALE`), or `JUMPHP_GUI_SCALE=1.5`. With a desktop that stretches a smaller picture to the screen (xrandr `--scale`, bilinear), every
+text is blurred whatever the program: use the screen's own resolution and the DPI setting instead (Xft.dpi 144 for 150 %): the forms then draw at the real pixels.
+
+## Graphics card in Docker (`bin/jumphp run`)
+
+The runtime image has Mesa 25 (bookworm-backports) and the Vulkan drivers, and the host's `/dev/dri` is passed. A recent AMD GPU (gfx1150 and above, e.g. Strix Halo)
+is unknown to the image's LLVM: `bin/jumphp run` then sets `MESA_LOADER_DRIVER_OVERRIDE=zink` (OpenGL over Vulkan) so that the GPU draws, not the CPU (a big
+window lagged). `JUMPHP_MESA_DRIVER=<driver>` (also in `.env`) forces another driver: `radeonsi`, `iris`, `llvmpipe` (the CPU)...

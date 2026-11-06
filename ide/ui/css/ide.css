@@ -672,3 +672,6 @@ body:has(.splitter.drag) iframe { pointer-events: none; }
 .log-row.warn .log-msg { color: var(--yellow, #e5c07b); }
 .log-row.error .log-msg { color: var(--red, #ff6b6b); }
 .tw-actions button.on { background: #ffffff22; }
+
+/* the dot on the welcome screen's News when a newer IDE waits */
+.w-nav .w-dot { display: inline-block; width: 8px; height: 8px; margin-left: auto; border-radius: 50%; background: var(--accent, #3b82f6); }

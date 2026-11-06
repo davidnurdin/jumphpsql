@@ -104,7 +104,7 @@ games/<id>/
    - no colour integers like `0xFF000000`: use `[r, g, b, a]` arrays, `'#rrggbb'` strings or `Color`.
    - no `pack('q'/'J'/'P')`: use `C c v s V g` (see MessageCodec).
    - big counters (score > 2 billion) are floats.
-4. **Network only through `JumPHP\Net`** (`$this->engine->net()`, multiplayer) and **`JumPHP\Http`**
+4. **Network only through `JumPHP\Net`** (`$this->engine->net()`, multiplayer; `$this->engine->tcp()`, TCP, §9) and **`JumPHP\Http`**
    (`$this->engine->http()`, web APIs). No `socket_*`, `fsockopen`, `stream_socket_client`, curl or
    `file_get_contents('http...')`: they do not exist in the browser (and they block the frame).
 5. **Files**: read game files with paths relative to the game root through `$this->engine->config->path('assets/...')`
@@ -126,11 +126,16 @@ games/<id>/
     screenshot (`bin/jumphp shot <game>`).
 
 12. **Keep a history of what you do** (the JumPHP IDE does it by itself for its Claude / OpenCode window; do it yourself when you
-    are launched any other way, e.g. Claude Code in a terminal): at the end of each piece of work, write
-    `IA/HISTORY/<CLAUDE|OPEN CODE>/<model>/<dd-mm-YYYY HH-MM-SS>/<what it was about>.md` **at the root of the project** (the request,
-    what you did, the files and commands, the result; no `:` in the folder name, Windows refuses it). `IA/` is **never sent to git**:
-    make sure `/IA/` is in the project's `.gitignore`, and tell the user once that this history lives on their computer only and is
-    lost if the folder or the computer is.
+    are launched any other way, e.g. Claude Code in a terminal), **at the root of the project, in `IA/HISTORY/`**, so that any AI can walk
+    through the whole folder and know what happened:
+    - `IA/HISTORY/INDEX.md`: one line per turn, oldest first (turn number, date, assistant, model, number of actions, result, request, folder);
+      the turn numbers only grow (`IA/HISTORY/.seq` holds the last one: 0001, 0002...);
+    - per turn, in `IA/HISTORY/<CLAUDE|OPEN CODE>/<model>/<dd-mm-YYYY HH-MM-SS>/` (no `:`, Windows refuses it):
+      `<turn>-<request>.md` (every message, the user's and yours, **with its date and time**) and a **separate file**
+      `<turn>-<request>.actions.md` with **every command / tool you ran, numbered in order** (`0007-001`, `0007-002`...), each with its
+      start and end time, the command itself, its **result** (the end of it when it is long) and whether it worked.
+    `IA/` is **never sent to git**: make sure `/IA/` is in the project's `.gitignore`, and tell the user once that this history lives on
+    their computer only and is lost if the folder or the computer is.
 
 ---
 
@@ -271,7 +276,6 @@ Replace its scenes and entities with your game:
    | `pause_on_blur`, `mute_when_hidden` | true, true | |
    | `pwa` | false | `true` or `{name, short_name, display, orientation, theme_color, background_color}`: installable, plays offline (§9) |
    | `debug_key`, `fullscreen_key` | F3, F11 | |
-   | `ssh` | false | `true`: `bin/jumphp run` gives the program the user's ssh-agent (`SSH_AUTH_SOCK`) and `~/.ssh` (read only), for apps that open SSH tunnels with the system's `ssh` (the desktop image has `openssh-client` and `libnss-wrapper`: ssh wants the uid in passwd) |
    | `double_click_fullscreen` | true | browser: a double click on the game goes fullscreen; `false` for games clicked fast (two clicks in a row) |
 2. **`config/input.yaml`**: your actions (`jump`, `fire`, `p1_up`...). The engine already defines
    `up down left right confirm back pause`.
@@ -651,6 +655,17 @@ Prefer counting `$dt` in the scene (timers keep running when the scene changes: 
 5. Test online headless: two processes with `JUMPHP_REALTIME=1`, `JUMPHP_SCENE='JumPHP\Net\LobbyScene'`,
    `JUMPHP_SCENE_PARAMS='{"next":"App\\Scene\\PlayScene","nextParams":{"mode":"online"},"auto":"quick"}'`,
    `JUMPHP_NET_URL=ws://127.0.0.1:8090/ws` and `--network host` (see docs/reseau.md).
+
+**TCP** (`$this->engine->tcp()`, `JumPHP\Net\Tcp`; a SQL client, a Redis tool...): `$c = $engine->tcp()->connect($host, $port)`, events
+`open`, `data` (string), `close` (?string reason), `error` (string); `$c->write($bytes)`, `$c->close()`. Never blocks. Desktop: a plain socket.
+**Browser**: no socket exists, so it goes through the playground's **TCP bridge** (WebSocket -> TCP), only for an application the
+**administrator approved** for this exact commit: the owner asks in the studio (project page, "Accès TCP"), the administrator
+(`davidnurdin`) approves or refuses from his notifications; a modified application must be approved again. The page gets a 2-minute
+ticket (`POST /api/tcp/ticket`, project.yaml `tcp_ticket_url`, default https://jumphp.net/api/tcp/ticket) signed with the app's Ed25519 key
+(kept encrypted on the owner's account) and the platform's signature of the approval (slug | commit | public key); the bridge
+(`docker/tcpbridge` of the playground) checks both, allows database ports only (3306, 5432, 1433, 6379, 27017...), never a private or
+reserved address. Without approval the `error` event says why. Code that must work on both: use `Tcp`, never `stream_socket_client`
+(rule 4). Example: `apps/jumphpsql` (`MysqlConnection` takes `['tcp' => $engine->tcp()]` in its config). Tests: `engine/tests/Net/TcpTest.php`.
 
 **Threads** (`JumPHP\Async`, `$this->engine->tasks()`): heavy work (level generation, path finding, AI,
 procedural pictures) off the main thread, so the frame never waits.

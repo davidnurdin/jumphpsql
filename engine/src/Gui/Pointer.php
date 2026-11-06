@@ -14,6 +14,8 @@ final class Pointer
     public bool $down = false;
     public bool $up = false;
     public bool $held = false;
+    /** the right button went down this frame (the context menu of a text field) */
+    public bool $right = false;
     /** a second press quickly at the same place */
     public bool $double = false;
     /** @var list<int> SDL key codes pressed this frame (arrows, Return, Tab, Backspace...) */

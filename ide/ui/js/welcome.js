@@ -61,7 +61,15 @@ export class Welcome {
   render() {
     const s = this.state;
     clear(this.node);
-    const nav = (id, label, ico) => el(`button${this.section === id ? '.on' : ''}`, { onclick: () => { this.section = id; this.render(); } }, icon(ico), label);
+    // a dot on News while a newer IDE waits (found by the background check, or downloaded and waiting for a restart)
+    if (backend.kind === 'native' && !this.updateWatch) {
+      this.updateWatch = true;
+      const set = (st) => { const waiting = st?.state === 'available' || st?.state === 'installed'; if (waiting !== !!this.updateWaiting) { this.updateWaiting = waiting; this.render(); } };
+      backend.invoke('update.state').then(set).catch(() => null);
+      backend.on('update.state', set);
+    }
+    const nav = (id, label, ico) => el(`button${this.section === id ? '.on' : ''}`, { onclick: () => { this.section = id; this.render(); } }, icon(ico), label,
+      id === 'news' && this.updateWaiting ? el('span.w-dot', { title: t('A newer JumPHP IDE is ready') }) : null);
     const side = el('div.w-side', {},
       el('div.w-brand', {}, el('img', { src: 'img/icon.png', alt: '' }), el('div', {}, el('b', {}, 'JumPHP IDE'), el('small', {}, s.version ? t('version {v}', { v: s.version }) : ''))),
       el('div.w-nav', {}, nav('projects', t('Projects'), 'folder'), nav('new', t('New Project'), 'plus'), nav('news', t('News'), 'bell'), nav('learn', t('Learn'), 'star')),

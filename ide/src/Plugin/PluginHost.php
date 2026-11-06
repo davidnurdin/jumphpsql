@@ -443,6 +443,8 @@ final class PluginHost
 
     private function emitError(string $where, \Throwable $e): void
     {
+        // in the Logs window too, under the plugin's own name (source "plugin <name>")
+        $this->ide->log?->add('error', 'plugin ' . $where, $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')');
         ($this->emit)('ide.error', ['where' => $where, 'message' => $e->getMessage(), 'at' => basename($e->getFile()) . ':' . $e->getLine()]);
     }
 

@@ -154,6 +154,7 @@ export class ClaudePanel {
   tabMenu(c, e) {
     menu([
       this.detached || backend.kind !== 'native' ? null : { label: 'Open in a Window', icon: 'split', action: () => this.undock(c) },
+      backend.kind !== 'native' || this.remote ? null : { label: 'Open in a Terminal', icon: 'terminal', action: () => this.undockTerminal(c) },
       { label: 'Rename…', action: async () => { const t = await prompt('Rename the conversation', { value: c.title() }); if (t != null) { c.name = t.trim(); c.save(); this.renderTabs(); } } },
       this.historyLocal ? { label: 'Copy as Markdown', action: () => c.markdown().then((md) => { copyText(md); notify('Copied', 'info'); }) } : null,
       this.detached ? null : '-',
@@ -172,6 +173,7 @@ export class ClaudePanel {
 
   drop(c) {
     c.dispose();
+    clearInterval(c.watchScroll);
     this.convs = this.convs.filter((x) => x !== c);
     if (this.active === c) this.show(this.convs[this.convs.length - 1] || null);
     if (!this.convs.length) this.openConversation();
@@ -187,6 +189,17 @@ export class ClaudePanel {
     } catch (e) { notify(e.message, 'error'); return; }
     this.drop(c);
     this.saveTabs([c]);
+  }
+
+  /** Open in a Terminal: the standard claude / opencode program in the desktop's terminal, resuming this conversation. */
+  async undockTerminal(c) {
+    if (!c) return;
+    await c.saveNow?.();
+    const agent = this.agent;
+    try {
+      const { terminal } = await backend.invoke('claude.terminal', { agent, session: c.session || '', mode: this.mode, model: agent === 'opencode' ? this.opencodeModel : this.model });
+      notify(`${agent === 'opencode' ? 'OpenCode' : 'Claude'} opened in ${terminal}` + (c.session ? ' (this conversation resumed)' : ''), 'info');
+    } catch (e) { notify(e.message, 'error'); }
   }
 
   /** Messages between the IDE's windows (the PHP side sends ui.broadcast to every window). */
@@ -369,6 +382,8 @@ export class ClaudePanel {
       this.detached ? null : el('button', { title: 'New conversation (the others go on)', onclick: () => this.openConversation() }, icon('plus')),
       this.detached || backend.kind !== 'native' || this.remote ? null
         : el('button', { title: 'Open this conversation in a window', onclick: () => this.current() && this.undock(this.current()) }, icon('split')),
+      backend.kind !== 'native' || this.remote ? null
+        : el('button', { title: 'Open this conversation in a terminal (the standard claude / opencode program)', onclick: () => this.undockTerminal(this.current()) }, icon('terminal')),
       el('button', { title: 'What Claude may do: ' + MODES[this.mode][0], onclick: (e) => menu([
         { head: 'What Claude may do' },
         ...Object.entries(MODES).map(([id, [label, hint]]) => ({ label, hint, checked: this.mode === id, action: () => this.setMode(id) })),
@@ -421,7 +436,24 @@ class Conversation {
     // the conversation stays at its end: when the window is shown again (it was hidden, its size 0), re-laid out, rebuilt (reopening the IDE,
     // a permission asked) it went back to the top; a reader who scrolled up is left where they are
     this.stick = true;
-    this.log.addEventListener('scroll', () => { if (this.log.clientHeight > 0) this.stick = this.log.scrollHeight - this.log.scrollTop - this.log.clientHeight < 80; });
+    // The browser puts a scrolled element back at the top when it is taken out of the page and put back (the window shown again after
+    // a question or a permission in a central dialog): that is not the reader scrolling up. Only a wheel, a touch, a key or the mouse
+    // (the scroll bar) in the last moments is: any other jump to the top is undone.
+    this.userAt = 0;
+    this.savedTop = 0;       // where the reader themselves left it (their own scrolling only)
+    for (const ev of ['wheel', 'touchstart', 'mousedown', 'keydown', 'pointerdown']) this.log.addEventListener(ev, () => { this.userAt = Date.now(); }, { passive: true });
+    this.log.addEventListener('scroll', () => {
+      if (this.log.clientHeight <= 0) return;
+      const top = this.log.scrollTop;
+      const byReader = Date.now() - this.userAt < 600;
+      if (!byReader && top < 4 && this.log.scrollHeight > this.log.clientHeight + 80 && (this.stick || this.savedTop > 80)) {
+        // thrown back to the top by itself: back to where the reader was (the end, or where they had scrolled to)
+        this.log.scrollTop = this.stick ? this.log.scrollHeight : this.savedTop;
+        return;
+      }
+      this.stick = this.log.scrollHeight - top - this.log.clientHeight < 80;
+      if (byReader) this.savedTop = top;
+    });
     // the content grows by itself (a tool's result, markdown, an image, the spinner moving): while the reader is at the bottom, follow it
     if (typeof MutationObserver !== 'undefined') {
       let pending = false;
@@ -431,7 +463,22 @@ class Conversation {
         requestAnimationFrame(() => { pending = false; if (this.stick && this.log.clientHeight > 0) this.log.scrollTop = this.log.scrollHeight; });
       }).observe(this.log, { childList: true, subtree: true, characterData: true });
     }
-    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { if (this.stick && this.log.clientHeight > 0) this.log.scrollTop = this.log.scrollHeight; }).observe(this.log);
+    // put back in the page (or shown again), the browser may set the position back to the top after this callback: pin the end now, next
+    // frame and shortly after (only while the reader is at the end, or was before it happened)
+    const pin = () => {
+      if (this.log.clientHeight <= 0) return;
+      if (this.stick) this.log.scrollTop = this.log.scrollHeight;
+      else if (this.savedTop > 80 && this.log.scrollTop < 4 && Date.now() - this.userAt > 600) this.log.scrollTop = this.savedTop;     // where they had scrolled to
+    };
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(() => { pin(); requestAnimationFrame(() => { pin(); setTimeout(pin, 150); }); }).observe(this.log);
+    }
+    // and a light watch while the window is open: whatever sets it back to the top (a dialog, a re-layout, a re-render), the reader's place is put back
+    this.watchScroll = setInterval(() => {
+      if (!this.log.isConnected) return;
+      const lost = this.log.clientHeight > 0 && this.log.scrollTop < 4 && this.log.scrollHeight > this.log.clientHeight + 80 && Date.now() - this.userAt > 600;
+      if (lost && (this.stick || this.savedTop > 80)) pin();
+    }, 300);
     this.plan = el('div.claude-plan', { hidden: true });
     this.input = el('textarea.input.claude-input', { rows: 3, placeholder: 'Ask Claude… (Enter to send, Shift+Enter: new line, @path: a file)',
       onkeydown: (e) => { if (e.key === 'Tab' && e.shiftKey) { e.preventDefault(); this.panel.cycleMode(); return; } if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); this.send(); } } });
@@ -560,9 +607,11 @@ class Conversation {
   remoteControl() {
     if (this.panel.remote) { notify('Remote Control needs Claude Code on this computer (the desktop IDE).', 'info'); return; }
     this.input.value = '';
+    // the same thing you type by hand: an interactive claude on this session, then its own /remote-control command (given as the first
+    // prompt). `claude --remote-control` on a session that `claude -p` made did not show on the phone, while /remote-control typed in claude did
     const session = /^[\w-]+$/.test(this.session || '') ? ` --resume ${this.session}` : '';
-    this.app.terminal.run(`claude --remote-control${session}`, 'Claude Remote Control');
-    this.add({ role: 'note', text: 'Remote Control: this conversation goes on in the Terminal; open it from claude.ai/code or the Claude app.' });
+    this.app.terminal.run(`claude${session} "/remote-control"`, 'Claude Remote Control');
+    this.add({ role: 'note', text: 'Remote Control: this conversation goes on in the Terminal, where Claude turns Remote Control on itself (/remote-control). Open it from claude.ai/code or the Claude app; if the Terminal shows no "Remote Control active" line, type /remote-control there.' });
   }
 
   /** Claude works: the spinner, Stop, the box for more. */

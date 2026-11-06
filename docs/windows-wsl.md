@@ -6,8 +6,9 @@ distribution** works too: no Docker Desktop licence, often faster.
 ## Setting it up
 
 1. WSL 2 with a distribution (PowerShell as administrator): `wsl --install -d Ubuntu`, then restart.
-2. Inside the distribution: Docker Engine (https://docs.docker.com/engine/install/ubuntu/), then
-   `sudo usermod -aG docker $USER`, close the WSL window, open it again.
+2. Inside the distribution: Docker Engine (https://docs.docker.com/engine/install/ubuntu/; or Ubuntu's own `sudo apt install docker.io
+   docker-buildx`: **buildx is needed**, the images are built with `docker build --build-context`, and `bin/jumphp` says so when it is
+   missing), then `sudo usermod -aG docker $USER`, close the WSL window, open it again.
 3. Check from Windows: `wsl -e docker info` must answer (and `docker info` on Windows may not: that is the point).
    With systemd in WSL (the default on recent Ubuntu), Docker starts with the distribution; else
    `wsl -e sudo service docker start`.
