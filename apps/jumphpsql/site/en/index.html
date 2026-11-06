@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>jumphpsql — a free MySQL / MariaDB client written in PHP</title>
+  <meta name="description" content="jumphpsql is a free MySQL and MariaDB client written in PHP: browse databases, edit rows, run SQL, make dumps, through an SSH tunnel if needed. Linux, Windows, macOS.">
+  <link rel="canonical" href="https://{{DOMAIN}}/en/">
+  <link rel="alternate" hreflang="fr" href="https://{{DOMAIN}}/">
+  <link rel="alternate" hreflang="en" href="https://{{DOMAIN}}/en/">
+  <link rel="alternate" hreflang="x-default" href="https://{{DOMAIN}}/">
+  <link rel="icon" type="image/png" href="../images/favicon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="jumphpsql">
+  <meta property="og:title" content="jumphpsql — a free MySQL / MariaDB client written in PHP">
+  <meta property="og:description" content="jumphpsql is a free MySQL and MariaDB client written in PHP: browse databases, edit rows, run SQL, make dumps, through an SSH tunnel if needed. Linux, Windows, macOS.">
+  <meta property="og:url" content="https://{{DOMAIN}}/en/">
+  <meta property="og:image" content="https://{{DOMAIN}}/images/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="jumphpsql — a free MySQL / MariaDB client written in PHP">
+  <meta name="twitter:description" content="jumphpsql is a free MySQL and MariaDB client written in PHP: browse databases, edit rows, run SQL, make dumps, through an SSH tunnel if needed. Linux, Windows, macOS.">
+  <meta name="twitter:image" content="https://{{DOMAIN}}/images/og.png">
+  <meta name="theme-color" content="#2c2578">
+  <script type="application/ld+json">[{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "jumphpsql", "description": "jumphpsql is a free MySQL and MariaDB client written in PHP: browse databases, edit rows, run SQL, make dumps, through an SSH tunnel if needed. Linux, Windows, macOS.", "applicationCategory": "DeveloperApplication", "operatingSystem": "Linux, Windows, macOS", "url": "https://{{DOMAIN}}/en/", "image": "https://{{DOMAIN}}/images/og.png", "screenshot": ["https://{{DOMAIN}}/images/data.webp", "https://{{DOMAIN}}/images/sql.webp", "https://{{DOMAIN}}/images/structure.webp", "https://{{DOMAIN}}/images/dark.webp"], "inLanguage": "en", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}, "codeRepository": "https://github.com/davidnurdin/jumphpsql", "softwareVersion": "0.1.0"}, {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is it free?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, and its source code is on GitHub."}}, {"@type": "Question", "name": "Which servers are supported?", "acceptedAnswer": {"@type": "Answer", "text": "MySQL 5.7 and 8.x, and MariaDB, with the usual authentication methods."}}, {"@type": "Question", "name": "Can my edits break a table?", "acceptedAnswer": {"@type": "Answer", "text": "Changes wait until “Save changes”, then go in a single transaction, rolled back at the first error."}}, {"@type": "Question", "name": "Can I reach a server behind a bastion?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, through an SSH tunnel: agent, key, password or ~/.ssh/config. Secrets never go on the command line."}}, {"@type": "Question", "name": "Does it run in the browser?", "acceptedAnswer": {"@type": "Answer", "text": "The interface shows there, but a browser cannot open a TCP connection to MySQL: use the desktop version."}}]}]</script>
+  <style>
+    :root { --ink: #1d1f33; --muted: #5b5f7a; --bg: #f3f4f7; --card: #fff; --brand: #4f5bd5; --deep: #2c2578; --orange: #ff8c28; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+    a { color: var(--brand); }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+    header.hero { background: linear-gradient(180deg, #232060, #15133a); color: #fff; padding: 20px 0 56px; }
+    nav { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 15px; }
+    nav .brand { display: flex; align-items: center; gap: 10px; color: #fff; text-decoration: none; font-weight: 700; }
+    nav .langs { color: #c4c8f0; } nav .langs a { color: #fff; }
+    .intro { display: grid; grid-template-columns: 1fr; gap: 32px; align-items: center; margin-top: 40px; }
+    @media (min-width: 860px) { .intro { grid-template-columns: 5fr 7fr; } }
+    h1 { font-size: clamp(38px, 7vw, 60px); line-height: 1.05; margin: 16px 0 8px; }
+    .tagline { color: var(--orange); font-size: 22px; font-weight: 600; margin: 0 0 16px; }
+    .lead { color: #d6d9f6; margin: 0 0 24px; }
+    .cta { display: flex; flex-wrap: wrap; gap: 12px; }
+    .btn { display: inline-block; padding: 12px 22px; border-radius: 10px; font-weight: 700; text-decoration: none; }
+    .btn.primary { background: var(--orange); color: #fff; }
+    .btn.ghost { border: 2px solid #8f96e8; color: #fff; }
+    .note { color: #a7acdb; font-size: 14px; margin-top: 12px; }
+    .intro img.hero-shot { width: 100%; height: auto; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,.45); }
+    section { padding: 56px 0 8px; }
+    h2 { font-size: 30px; margin: 0 0 24px; }
+    ul.features { list-style: none; padding: 0; margin: 0; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    ul.features li { background: var(--card); border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(20,20,60,.08); }
+    ul.features h3 { margin: 0 0 6px; font-size: 18px; color: var(--deep); }
+    ul.features p { margin: 0; color: var(--muted); font-size: 15px; }
+    .gallery { display: grid; gap: 24px; grid-template-columns: 1fr; }
+    @media (min-width: 860px) { .gallery { grid-template-columns: 1fr 1fr; } }
+    figure { margin: 0; }
+    figure img { width: 100%; height: auto; border-radius: 10px; box-shadow: 0 6px 20px rgba(20,20,60,.15); }
+    figcaption { color: var(--muted); font-size: 15px; margin-top: 8px; }
+    pre { background: #15133a; color: #e8e9ff; padding: 16px; border-radius: 10px; overflow-x: auto; font-size: 15px; }
+    details { background: var(--card); border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; }
+    summary { font-weight: 700; cursor: pointer; }
+    details p { margin: 8px 0 0; color: var(--muted); }
+    .again { text-align: center; margin: 40px 0 0; }
+    footer { margin-top: 56px; padding: 24px 0; color: var(--muted); font-size: 14px; border-top: 1px solid #dfe1ea; }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <nav>
+        <a class="brand" href="../"><img src="../images/favicon.png" alt="" width="28" height="28">jumphpsql</a>
+        <span class="langs" aria-label="Language"><a href="../" hreflang="fr" lang="fr">Français</a> · <span aria-current="page">English</span></span>
+      </nav>
+      <div class="intro">
+        <div>
+          <img src="../images/icon.png" alt="jumphpsql" width="96" height="96">
+          <h1>jumphpsql</h1>
+          <p class="tagline">The MySQL / MariaDB client written in PHP</p>
+          <p class="lead">Browse your databases, edit rows, run SQL and back up your data in a fast, light window. The MySQL protocol is spoken in pure PHP, without mysqli or PDO, and the window never freezes.</p>
+          <div class="cta">
+            <a class="btn primary" href="https://github.com/davidnurdin/jumphpsql">Source code on GitHub</a>
+            <a class="btn ghost" href="../play/">▶ See the interface</a>
+          </div>
+          <p class="note">The browser preview shows the interface: connecting to a server needs the desktop version.</p>
+        </div>
+        <img class="hero-shot" src="../images/data.webp" alt="The rows of a table, editable, with the filter and the pages" width="1400" height="957">
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <section>
+      <h2>What it does</h2>
+      <ul class="features">
+      <li><h3>Saved connections</h3><p>Host, port, user, default database; the password saved or asked for. Each connection is tested before it is saved.</p></li>
+      <li><h3>The database tree</h3><p>Databases, their tables and views, with the row count of each table.</p></li>
+      <li><h3>The rows of a table</h3><p>WHERE filter, sort by clicking a column, pages of 200 rows. NULL values clearly shown.</p></li>
+      <li><h3>Safe editing</h3><p>Edit cells in place, add and delete rows, then save everything in one transaction: nothing is written if one statement fails.</p></li>
+      <li><h3>SQL editor</h3><p>Syntax colours, Ctrl+Return runs the statement under the cursor, F5 the whole script; the rows of each result.</p></li>
+      <li><h3>The structure</h3><p>The columns of a table (type, key, default…) and its CREATE TABLE.</p></li>
+      <li><h3>Dumps and imports</h3><p>Save a database or a table as .sql, run a .sql file, with a progress bar.</p></li>
+      <li><h3>SSH tunnels</h3><p>Go through a bastion: the session’s SSH agent, a key file with its passphrase, a password, or your ~/.ssh/config.</p></li>
+      <li><h3>Dark theme</h3><p>Light or dark, in one click.</p></li>
+      </ul>
+    </section>
+    <section>
+      <h2>Screenshots</h2>
+      <div class="gallery">
+      <figure><img src="../images/data.webp" alt="The rows of a table, editable, with the filter and the pages" width="1400" height="957" loading="lazy"><figcaption>The rows of a table, editable, with the filter and the pages</figcaption></figure>
+      <figure><img src="../images/sql.webp" alt="The SQL editor and the result of a query" width="1400" height="957" loading="lazy"><figcaption>The SQL editor and the result of a query</figcaption></figure>
+      <figure><img src="../images/structure.webp" alt="The structure of a table and its CREATE TABLE" width="1400" height="957" loading="lazy"><figcaption>The structure of a table and its CREATE TABLE</figcaption></figure>
+      <figure><img src="../images/dark.webp" alt="The dark theme" width="1400" height="957" loading="lazy"><figcaption>The dark theme</figcaption></figure>
+      </div>
+    </section>
+    <section>
+      <h2>PHP, all the way down</h2>
+      <p>jumphpsql is made with <a href="https://jumphp.net">JumPHP</a>: the window, the buttons, the data grid and the editor are drawn by PHP (JumPHP\Gui, no HTML). The MySQL client is written in PHP too, non-blocking: queries are queued, answers arrive between two frames. Works with MySQL 5.7 / 8.x and MariaDB (mysql_native_password, caching_sha2_password, client_ed25519).</p>
+    </section>
+    <section>
+      <h2>Install it</h2>
+      <p>Clone the repository and start the app with JumPHP’s command (everything runs in Docker, nothing else to install):</p>
+      <pre><code>git clone https://github.com/davidnurdin/jumphpsql.git
+cd jumphpsql
+bin/jumphp run jumphpsql</code></pre>
+    </section>
+    <section>
+      <h2>FAQ</h2>
+      <details><summary>Is it free?</summary><p>Yes, and its source code is on GitHub.</p></details>
+      <details><summary>Which servers are supported?</summary><p>MySQL 5.7 and 8.x, and MariaDB, with the usual authentication methods.</p></details>
+      <details><summary>Can my edits break a table?</summary><p>Changes wait until “Save changes”, then go in a single transaction, rolled back at the first error.</p></details>
+      <details><summary>Can I reach a server behind a bastion?</summary><p>Yes, through an SSH tunnel: agent, key, password or ~/.ssh/config. Secrets never go on the command line.</p></details>
+      <details><summary>Does it run in the browser?</summary><p>The interface shows there, but a browser cannot open a TCP connection to MySQL: use the desktop version.</p></details>
+      <p class="again"><a class="btn primary" href="https://github.com/davidnurdin/jumphpsql">Source code on GitHub</a></p>
+    </section>
+  </main>
+  <footer><div class="wrap">jumphpsql, made with JumPHP. · <a href="https://github.com/davidnurdin/jumphpsql">GitHub</a> · <a href="../play/">See the interface</a></div></footer>
+</body>
+</html>
