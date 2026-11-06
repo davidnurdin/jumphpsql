@@ -390,6 +390,9 @@ async function main() {
 	// (view: window) too: it is used, not started
 	if (GAME.ui === 'webview') return;
 	if (GAME.view === 'window') { canvas.focus(); return; }
+	// an application (graphic, terminal...) is used, not started: no "click to play" (kind comes from project.yaml, a game by default)
+	const isApp = GAME.kind && GAME.kind !== 'game';
+	if (isApp) { canvas.focus(); return; }
 	// browsers start audio and keyboard focus after a user gesture: one click / tap / key on the overlay
 	const overlay = $('overlay');
 	overlay.style.display = 'flex';
@@ -399,6 +402,8 @@ async function main() {
 		removeEventListener('keydown', start, true);
 		// phones: fullscreen + landscape at once (game.yaml `touch: {fullscreen: false}` turns it off)
 		if (TOUCH && (GAME.touch || {}).fullscreen !== false) enterFullscreen();
+		// the games' page of the playground (a game without a web site of its own): ?fullscreen=1 in the frame's address, the first click goes fullscreen
+		else if (params.get('fullscreen') === '1') enterFullscreen();
 	};
 	// a touch only allows fullscreen when the finger goes up (pointerup), a mouse when it goes down
 	overlay.addEventListener(TOUCH ? 'pointerup' : 'pointerdown', start, { once: true });

@@ -705,12 +705,11 @@ class Conversation {
         if (panel.active === this) panel.usage.context(this.context);
       }
       const seconds = Math.round((event.duration_ms || (Date.now() - this.run.started)) / 1000);
-      const cost = typeof event.total_cost_usd === 'number' ? ` · $${event.total_cost_usd.toFixed(3)}` : '';
       if (event.is_error && event.result) this.add({ role: 'error', text: event.result });
       if (event.permission_denials?.length) {
         this.add({ role: 'note', text: `Refused (mode “${MODES[panel.mode][0]}”): ${event.permission_denials.map((d) => d.tool_name).join(', ')}. Change what Claude may do (⚙) and ask again.` });
       }
-      this.add({ role: 'done', text: `${event.is_error ? 'Stopped' : 'Done'} · ${seconds} s · ${this.run.tools} action(s)${cost}` });
+      this.add({ role: 'done', text: `${event.is_error ? 'Stopped' : 'Done'} · ${seconds} s · ${this.run.tools} action(s)` });
       if (!panel.remote) { this.endTurn(); this.autoCompact(); return; }
     }
     this.save();

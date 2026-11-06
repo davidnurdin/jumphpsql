@@ -34,6 +34,7 @@ $manifest = [
     'net_url' => $config['net_url'],
     'touch' => $config['touch'] ?? null,
     'view' => $config['view'] ?? 'fixed',
+    'kind' => $config['kind'] ?? (($config['ui'] ?? null) === 'webview' ? 'app' : 'game'),
     'double_click_fullscreen' => (bool)($config['double_click_fullscreen'] ?? true),
     'thumbnail' => is_file("$game/assets/thumbnail.png") ? 'thumbnail.png' : null,
     'controls' => $config['controls'] ?? null,

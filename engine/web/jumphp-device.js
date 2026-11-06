@@ -119,4 +119,37 @@ export function install(api) {
 				break;
 		}
 	});
+
+	// the file chooser (JumPHP\Native\FilePicker in the browser): the files chosen are written into the engine's memory, PHP gets their paths.
+	// Called from a click handler of the application: the browser still counts it as the user's gesture.
+	api.on('filepick', (msg) => {
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.multiple = !!msg.multiple;
+		if (msg.accept) input.accept = msg.accept;
+		input.style.display = 'none';
+		document.body.appendChild(input);
+		let done = false;
+		const finish = (paths) => {
+			if (done) return;
+			done = true;
+			input.remove();
+			api.send('filepick', { id: msg.id, paths });
+		};
+		input.addEventListener('change', async () => {
+			const FS = api.FS();
+			try {
+				FS.mkdirTree('/tmp/jumphp-picked');
+				const paths = [];
+				for (const file of input.files) {
+					const path = '/tmp/jumphp-picked/' + file.name.replace(/[\\/]/g, '_');
+					FS.writeFile(path, new Uint8Array(await file.arrayBuffer()));
+					paths.push(path);
+				}
+				finish(paths);
+			} catch (e) { finish(null); }
+		});
+		input.addEventListener('cancel', () => finish(null));
+		input.click();
+	});
 }

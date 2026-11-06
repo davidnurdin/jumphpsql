@@ -53,3 +53,10 @@ Le pont : `docker/tcpbridge` du dépôt jumphp-playground (service `tcpbridge`, 
   Le pont ne fait confiance qu'à la clé publique du playground (`/api/tcp/public-key`) : il n'a aucun secret. Plusieurs ponts possibles
   (un par région) avec le même `PLAYGROUND_URL`.
 - À faire (TODO.md) : encapsuler aussi UDP et ICMP.
+
+## Blocages durables, quota, alertes
+
+- Les blocages et les totaux du pont survivent à un redémarrage (`TCP_STATE_FILE`, un volume : `/data/state.json`).
+- **Quota de bande passante** par application : `TCP_QUOTA_MB_PER_HOUR` (2048 Mo par heure par défaut sur le playground, 0 = aucun). Dépassé :
+  l'application est bloquée 15 minutes et l'administrateur est prévenu : le pont appelle `TCP_ALERT_URL` (`/api/tcp/alert` du playground, avec le
+  secret partagé), la cloche s'allume et la page Administration liste les alertes.

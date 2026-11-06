@@ -14,7 +14,7 @@ use JumPHP\Tauri\App;
  * |--------------------------------------|----------|------------------------------------------------|
  * | desktop app (JumPHP\Tauri\App)       | tauri    | all: message, confirm, open, save, folder, notify, openUrl, openPath, reveal, copy, paste |
  * | game on the desktop (SDL)            | sdl      | message                                        |
- * | browser build                        | browser  | openUrl, copy                                  |
+ * | browser build                        | browser  | openUrl, copy, open (a file; the page writes it into /tmp/jumphp-picked) |
  * | headless runs (test, shot), others   | none     | nothing                                        |
  *
  * What a target lacks fails its Task with UnsupportedFeature (or returns false): check supports() first.

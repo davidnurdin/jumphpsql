@@ -1101,7 +1101,7 @@ bin/jumphp build notes               # dist/web/: the same app in a web page (we
   `await jumphp.invoke('name', payload)`, `jumphp.send('event', payload)`, `jumphp.on('event', fn)`, and the built-in
   `jumphp.invoke('native.open' | 'native.save' | 'native.message' | 'native.confirm' | 'native.notify' | 'native.openUrl', {...})`.
 - **Native features from PHP** (any target, `JumPHP\Native`): `Dialog::message()`, `Dialog::confirm()`,
-  `FilePicker::open() / folder() / save()` (Tasks), `Notification::show()`, `Shell::openUrl() / openPath() / reveal()`;
+  `FilePicker::open() / folder() / save()` (Tasks; in the browser only `open()`: the chosen file is written into the engine's memory, `/tmp/jumphp-picked/<name>`, call it from a click), `Notification::show()`, `Shell::openUrl() / openPath() / reveal()`;
   `Native::supports($feature)` first (SDL games: message only; browser: openUrl only; headless: none).
 - **Tests**: `tests/*Test.php` extending `JumPHP\Testing\AppTestCase` play the app without a window: `invoke()`,
   `pageSend()`, `requestClose()`, `answerDialog()`, `frames()`, `wait()`, `sent('window.set_title')`, `lastSent()`.
