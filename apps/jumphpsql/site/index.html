@@ -24,7 +24,7 @@
   <meta name="twitter:description" content="jumphpsql est un client MySQL et MariaDB gratuit écrit en PHP : parcourez les bases, éditez les lignes, exécutez du SQL, faites des dumps, à travers un tunnel SSH si besoin. Linux, Windows, macOS.">
   <meta name="twitter:image" content="https://{{DOMAIN}}/images/og.png">
   <meta name="theme-color" content="#2c2578">
-  <script type="application/ld+json">[{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "jumphpsql", "description": "jumphpsql est un client MySQL et MariaDB gratuit écrit en PHP : parcourez les bases, éditez les lignes, exécutez du SQL, faites des dumps, à travers un tunnel SSH si besoin. Linux, Windows, macOS.", "applicationCategory": "DeveloperApplication", "operatingSystem": "Linux, Windows, macOS", "url": "https://{{DOMAIN}}/", "image": "https://{{DOMAIN}}/images/og.png", "screenshot": ["https://{{DOMAIN}}/images/data.webp", "https://{{DOMAIN}}/images/sql.webp", "https://{{DOMAIN}}/images/structure.webp", "https://{{DOMAIN}}/images/dark.webp"], "inLanguage": "fr", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}, "codeRepository": "https://github.com/davidnurdin/jumphpsql", "softwareVersion": "0.1.0"}, {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Est-ce gratuit ?", "acceptedAnswer": {"@type": "Answer", "text": "Oui, et son code source est sur GitHub."}}, {"@type": "Question", "name": "Quels serveurs sont pris en charge ?", "acceptedAnswer": {"@type": "Answer", "text": "MySQL 5.7 et 8.x, et MariaDB, avec les méthodes d’authentification courantes."}}, {"@type": "Question", "name": "Mes modifications peuvent-elles casser une table ?", "acceptedAnswer": {"@type": "Answer", "text": "Les changements restent en attente jusqu’à « Save changes », puis partent dans une seule transaction, annulée à la première erreur."}}, {"@type": "Question", "name": "Puis-je me connecter à un serveur derrière un bastion ?", "acceptedAnswer": {"@type": "Answer", "text": "Oui, par un tunnel SSH : agent, clé, mot de passe ou ~/.ssh/config. Les secrets ne passent jamais par la ligne de commande."}}, {"@type": "Question", "name": "Fonctionne-t-il dans le navigateur ?", "acceptedAnswer": {"@type": "Answer", "text": "L’interface s’y affiche, mais un navigateur ne peut pas ouvrir de connexion TCP vers MySQL : utilisez la version de bureau."}}]}]</script>
+  <script type="application/ld+json">[{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "jumphpsql", "description": "jumphpsql est un client MySQL et MariaDB gratuit écrit en PHP : parcourez les bases, éditez les lignes, exécutez du SQL, faites des dumps, à travers un tunnel SSH si besoin. Linux, Windows, macOS.", "applicationCategory": "DeveloperApplication", "operatingSystem": "Linux, Windows, macOS", "url": "https://{{DOMAIN}}/", "image": "https://{{DOMAIN}}/images/og.png", "screenshot": ["https://{{DOMAIN}}/images/data.webp", "https://{{DOMAIN}}/images/sql.webp", "https://{{DOMAIN}}/images/structure.webp", "https://{{DOMAIN}}/images/dark.webp"], "inLanguage": "fr", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}, "codeRepository": "https://github.com/davidnurdin/jumphpsql", "softwareVersion": "0.1.0", "downloadUrl": "https://github.com/davidnurdin/jumphpsql/releases/latest/download/jumphpsql-setup.exe"}, {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Est-ce gratuit ?", "acceptedAnswer": {"@type": "Answer", "text": "Oui, et son code source est sur GitHub."}}, {"@type": "Question", "name": "Quels serveurs sont pris en charge ?", "acceptedAnswer": {"@type": "Answer", "text": "MySQL 5.7 et 8.x, et MariaDB, avec les méthodes d’authentification courantes."}}, {"@type": "Question", "name": "Mes modifications peuvent-elles casser une table ?", "acceptedAnswer": {"@type": "Answer", "text": "Les changements restent en attente jusqu’à « Save changes », puis partent dans une seule transaction, annulée à la première erreur."}}, {"@type": "Question", "name": "Puis-je me connecter à un serveur derrière un bastion ?", "acceptedAnswer": {"@type": "Answer", "text": "Oui, par un tunnel SSH : agent, clé, mot de passe ou ~/.ssh/config. Les secrets ne passent jamais par la ligne de commande."}}, {"@type": "Question", "name": "Fonctionne-t-il dans le navigateur ?", "acceptedAnswer": {"@type": "Answer", "text": "Oui : la connexion passe par le pont TCP de jumphp.net, vers les serveurs joignables sur Internet. Pour un serveur de votre réseau local (localhost, 192.168…), prenez la version de bureau."}}]}]</script>
   <style>
     :root { --ink: #1d1f33; --muted: #5b5f7a; --bg: #f3f4f7; --card: #fff; --brand: #4f5bd5; --deep: #2c2578; --orange: #ff8c28; }
     * { box-sizing: border-box; }
@@ -61,6 +61,11 @@
     details { background: var(--card); border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; }
     summary { font-weight: 700; cursor: pointer; }
     details p { margin: 8px 0 0; color: var(--muted); }
+    .dl { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+    .dlbtn { display: flex; flex-direction: column; gap: 4px; background: var(--deep); color: #fff; text-decoration: none; padding: 16px 20px; border-radius: 12px; }
+    .dlbtn b { font-size: 20px; } .dlbtn span { color: #c4c8f0; font-size: 13px; word-break: break-all; } .dlbtn small { color: #ffb877; font-size: 13px; }
+    .dlbtn:hover { background: var(--brand); }
+    .small { font-size: 14px; }
     .again { text-align: center; margin: 40px 0 0; }
     footer { margin-top: 56px; padding: 24px 0; color: var(--muted); font-size: 14px; border-top: 1px solid #dfe1ea; }
   </style>
@@ -79,16 +84,27 @@
           <p class="tagline">Le client MySQL / MariaDB écrit en PHP</p>
           <p class="lead">Parcourez vos bases, éditez les lignes, exécutez du SQL et faites vos sauvegardes dans une fenêtre rapide et légère. Le protocole MySQL est parlé en PHP pur, sans mysqli ni PDO, et la fenêtre ne se bloque jamais.</p>
           <div class="cta">
-            <a class="btn primary" href="https://github.com/davidnurdin/jumphpsql" target="_blank" rel="noopener">Code source sur GitHub</a>
-            <a class="btn ghost" href="play/">▶ Voir l’interface</a>
+            <a class="btn primary" href="#download">⬇ Télécharger</a>
+            <a class="btn ghost" href="play/">▶ Essayer dans le navigateur</a>
+            <a class="btn ghost" href="https://github.com/davidnurdin/jumphpsql" target="_blank" rel="noopener">Code source sur GitHub</a>
           </div>
-          <p class="note">L’aperçu dans le navigateur montre l’interface : la connexion à un serveur demande la version de bureau.</p>
+          <p class="note">Gratuit, pour Windows, macOS et Linux. Dans le navigateur, la connexion passe par le pont TCP de jumphp.net (serveurs publics) ; pour un serveur de votre réseau local, prenez la version de bureau.</p>
         </div>
         <img class="hero-shot" src="images/data.webp" alt="Les lignes d’une table, éditables, avec le filtre et la pagination" width="1400" height="957">
       </div>
     </div>
   </header>
   <main class="wrap">
+    <section id="download">
+      <h2>Télécharger</h2>
+      <p>Un petit installateur par système : il installe la dernière version de jumphpsql, avec un raccourci et un désinstalleur. Gratuit, sans compte.</p>
+      <div class="dl">
+        <a class="dlbtn" href="https://github.com/davidnurdin/jumphpsql/releases/latest/download/jumphpsql-setup.exe" target="_blank" rel="noopener"><b>⬇ Windows</b><span>jumphpsql-setup.exe</span></a>
+        <a class="dlbtn" href="https://github.com/davidnurdin/jumphpsql/releases/latest/download/jumphpsql-setup-macos.zip" target="_blank" rel="noopener"><b>⬇ macOS</b><span>jumphpsql-setup-macos.zip</span><small>décompressez, puis clic droit › Ouvrir la première fois</small></a>
+        <a class="dlbtn" href="https://github.com/davidnurdin/jumphpsql/releases/latest/download/jumphpsql-setup-linux-x86_64" target="_blank" rel="noopener"><b>⬇ Linux</b><span>jumphpsql-setup-linux-x86_64</span><small>puis chmod +x et lancez-le</small></a>
+      </div>
+      <p class="small"><a href="https://github.com/davidnurdin/jumphpsql/releases" target="_blank" rel="noopener">Toutes les versions</a></p>
+    </section>
     <section>
       <h2>Ce qu’il fait</h2>
       <ul class="features">
@@ -117,8 +133,8 @@
       <p>jumphpsql est fait avec <a href="https://jumphp.net" target="_blank" rel="noopener">JumPHP</a> : la fenêtre, les boutons, la grille de données et l’éditeur sont dessinés par PHP (JumPHP\Gui, sans HTML). Le client MySQL est écrit en PHP lui aussi, non bloquant : les requêtes partent en file, les réponses arrivent entre deux images. Compatible MySQL 5.7 / 8.x et MariaDB (mysql_native_password, caching_sha2_password, client_ed25519).</p>
     </section>
     <section>
-      <h2>L’installer</h2>
-      <p>Clonez le dépôt et lancez l’application avec la commande de JumPHP (tout tourne dans Docker, rien à installer d’autre) :</p>
+      <h2>Depuis les sources</h2>
+      <p>Ou clonez le dépôt et lancez l’application avec la commande de JumPHP (tout tourne dans Docker, rien à installer d’autre) :</p>
       <pre><code>git clone https://github.com/davidnurdin/jumphpsql.git
 cd jumphpsql
 bin/jumphp run jumphpsql</code></pre>
@@ -129,10 +145,10 @@ bin/jumphp run jumphpsql</code></pre>
       <details><summary>Quels serveurs sont pris en charge ?</summary><p>MySQL 5.7 et 8.x, et MariaDB, avec les méthodes d’authentification courantes.</p></details>
       <details><summary>Mes modifications peuvent-elles casser une table ?</summary><p>Les changements restent en attente jusqu’à « Save changes », puis partent dans une seule transaction, annulée à la première erreur.</p></details>
       <details><summary>Puis-je me connecter à un serveur derrière un bastion ?</summary><p>Oui, par un tunnel SSH : agent, clé, mot de passe ou ~/.ssh/config. Les secrets ne passent jamais par la ligne de commande.</p></details>
-      <details><summary>Fonctionne-t-il dans le navigateur ?</summary><p>L’interface s’y affiche, mais un navigateur ne peut pas ouvrir de connexion TCP vers MySQL : utilisez la version de bureau.</p></details>
-      <p class="again"><a class="btn primary" href="https://github.com/davidnurdin/jumphpsql" target="_blank" rel="noopener">Code source sur GitHub</a></p>
+      <details><summary>Fonctionne-t-il dans le navigateur ?</summary><p>Oui : la connexion passe par le pont TCP de jumphp.net, vers les serveurs joignables sur Internet. Pour un serveur de votre réseau local (localhost, 192.168…), prenez la version de bureau.</p></details>
+      <p class="again"><a class="btn primary" href="#download">⬇ Télécharger</a></p>
     </section>
   </main>
-  <footer><div class="wrap">jumphpsql, fait avec JumPHP. · <a href="https://github.com/davidnurdin/jumphpsql" target="_blank" rel="noopener">GitHub</a> · <a href="play/">Voir l’interface</a></div></footer>
+  <footer><div class="wrap">jumphpsql, fait avec JumPHP. · <a href="https://github.com/davidnurdin/jumphpsql" target="_blank" rel="noopener">GitHub</a> · <a href="play/">Essayer dans le navigateur</a></div></footer>
 </body>
 </html>

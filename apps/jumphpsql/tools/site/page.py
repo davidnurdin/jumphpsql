@@ -8,6 +8,9 @@ from pathlib import Path
 app = Path(sys.argv[1])
 site = app / 'site'
 REPO = 'https://github.com/davidnurdin/jumphpsql'
+LATEST = REPO + '/releases/latest/download/'
+SETUP = {'windows': ('Windows', 'jumphpsql-setup.exe'), 'macos': ('macOS', 'jumphpsql-setup-macos.zip'),
+         'linux': ('Linux', 'jumphpsql-setup-linux-x86_64')}
 LANGS = {'fr': 'Français', 'en': 'English'}
 MAIN = 'fr'
 
@@ -21,8 +24,16 @@ T = {
         'lead': 'Parcourez vos bases, éditez les lignes, exécutez du SQL et faites vos sauvegardes dans une fenêtre rapide et '
                 'légère. Le protocole MySQL est parlé en PHP pur, sans mysqli ni PDO, et la fenêtre ne se bloque jamais.',
         'source': 'Code source sur GitHub',
-        'preview': 'Voir l’interface',
-        'preview_note': 'L’aperçu dans le navigateur montre l’interface : la connexion à un serveur demande la version de bureau.',
+        'preview': 'Essayer dans le navigateur',
+        'preview_note': 'Gratuit, pour Windows, macOS et Linux. Dans le navigateur, la connexion passe par le pont TCP de jumphp.net '
+                        '(serveurs publics) ; pour un serveur de votre réseau local, prenez la version de bureau.',
+        'download': 'Télécharger',
+        'downloads_h': 'Télécharger',
+        'downloads_note': 'Un petit installateur par système : il installe la dernière version de jumphpsql, avec un raccourci et un '
+                          'désinstalleur. Gratuit, sans compte.',
+        'linux_hint': 'puis chmod +x et lancez-le',
+        'mac_hint': 'décompressez, puis clic droit › Ouvrir la première fois',
+        'other': 'Toutes les versions',
         'features_h': 'Ce qu’il fait',
         'features': [
             ('Connexions enregistrées', 'Hôte, port, utilisateur, base par défaut ; le mot de passe enregistré ou demandé. Chaque connexion est testée avant d’être enregistrée.'),
@@ -47,15 +58,15 @@ T = {
                 'l’éditeur sont dessinés par PHP (JumPHP\\Gui, sans HTML). Le client MySQL est écrit en PHP lui aussi, non bloquant : '
                 'les requêtes partent en file, les réponses arrivent entre deux images. Compatible MySQL 5.7 / 8.x et MariaDB '
                 '(mysql_native_password, caching_sha2_password, client_ed25519).',
-        'install_h': 'L’installer',
-        'install': 'Clonez le dépôt et lancez l’application avec la commande de JumPHP (tout tourne dans Docker, rien à installer d’autre) :',
+        'install_h': 'Depuis les sources',
+        'install': 'Ou clonez le dépôt et lancez l’application avec la commande de JumPHP (tout tourne dans Docker, rien à installer d’autre) :',
         'faq_h': 'Questions fréquentes',
         'faq': [
             ('Est-ce gratuit ?', 'Oui, et son code source est sur GitHub.'),
             ('Quels serveurs sont pris en charge ?', 'MySQL 5.7 et 8.x, et MariaDB, avec les méthodes d’authentification courantes.'),
             ('Mes modifications peuvent-elles casser une table ?', 'Les changements restent en attente jusqu’à « Save changes », puis partent dans une seule transaction, annulée à la première erreur.'),
             ('Puis-je me connecter à un serveur derrière un bastion ?', 'Oui, par un tunnel SSH : agent, clé, mot de passe ou ~/.ssh/config. Les secrets ne passent jamais par la ligne de commande.'),
-            ('Fonctionne-t-il dans le navigateur ?', 'L’interface s’y affiche, mais un navigateur ne peut pas ouvrir de connexion TCP vers MySQL : utilisez la version de bureau.'),
+            ('Fonctionne-t-il dans le navigateur ?', 'Oui : la connexion passe par le pont TCP de jumphp.net, vers les serveurs joignables sur Internet. Pour un serveur de votre réseau local (localhost, 192.168…), prenez la version de bureau.'),
         ],
         'footer': 'jumphpsql, fait avec JumPHP.',
         'langs': 'Langue',
@@ -69,8 +80,16 @@ T = {
         'lead': 'Browse your databases, edit rows, run SQL and back up your data in a fast, light window. The MySQL protocol '
                 'is spoken in pure PHP, without mysqli or PDO, and the window never freezes.',
         'source': 'Source code on GitHub',
-        'preview': 'See the interface',
-        'preview_note': 'The browser preview shows the interface: connecting to a server needs the desktop version.',
+        'preview': 'Try it in the browser',
+        'preview_note': 'Free, for Windows, macOS and Linux. In the browser, the connection goes through jumphp.net’s TCP bridge '
+                        '(public servers); for a server on your local network, take the desktop version.',
+        'download': 'Download',
+        'downloads_h': 'Download',
+        'downloads_note': 'One small installer per system: it installs the newest jumphpsql, with a shortcut and an uninstaller. '
+                          'Free, no account.',
+        'linux_hint': 'then chmod +x and run it',
+        'mac_hint': 'unzip, then right click › Open the first time',
+        'other': 'All versions',
         'features_h': 'What it does',
         'features': [
             ('Saved connections', 'Host, port, user, default database; the password saved or asked for. Each connection is tested before it is saved.'),
@@ -95,15 +114,15 @@ T = {
                 'editor are drawn by PHP (JumPHP\\Gui, no HTML). The MySQL client is written in PHP too, non-blocking: queries are '
                 'queued, answers arrive between two frames. Works with MySQL 5.7 / 8.x and MariaDB (mysql_native_password, '
                 'caching_sha2_password, client_ed25519).',
-        'install_h': 'Install it',
-        'install': 'Clone the repository and start the app with JumPHP’s command (everything runs in Docker, nothing else to install):',
+        'install_h': 'From the sources',
+        'install': 'Or clone the repository and start the app with JumPHP’s command (everything runs in Docker, nothing else to install):',
         'faq_h': 'FAQ',
         'faq': [
             ('Is it free?', 'Yes, and its source code is on GitHub.'),
             ('Which servers are supported?', 'MySQL 5.7 and 8.x, and MariaDB, with the usual authentication methods.'),
             ('Can my edits break a table?', 'Changes wait until “Save changes”, then go in a single transaction, rolled back at the first error.'),
             ('Can I reach a server behind a bastion?', 'Yes, through an SSH tunnel: agent, key, password or ~/.ssh/config. Secrets never go on the command line.'),
-            ('Does it run in the browser?', 'The interface shows there, but a browser cannot open a TCP connection to MySQL: use the desktop version.'),
+            ('Does it run in the browser?', 'Yes: the connection goes through jumphp.net’s TCP bridge, to servers reachable on the Internet. For a server on your local network (localhost, 192.168…), take the desktop version.'),
         ],
         'footer': 'jumphpsql, made with JumPHP.',
         'langs': 'Language',
@@ -129,7 +148,7 @@ def page(lang: str) -> str:
         'operatingSystem': 'Linux, Windows, macOS', 'url': url, 'image': 'https://{{DOMAIN}}/images/og.png',
         'screenshot': [f'https://{{{{DOMAIN}}}}/images/{n}.webp' for n, _ in t['shots']], 'inLanguage': lang,
         'isAccessibleForFree': True, 'offers': {'@type': 'Offer', 'price': '0', 'priceCurrency': 'EUR'},
-        'codeRepository': REPO, 'softwareVersion': '0.1.0',
+        'codeRepository': REPO, 'softwareVersion': '0.1.0', 'downloadUrl': LATEST + SETUP['windows'][1],
     }, {
         '@context': 'https://schema.org', '@type': 'FAQPage',
         'mainEntity': [{'@type': 'Question', 'name': q, 'acceptedAnswer': {'@type': 'Answer', 'text': a}} for q, a in t['faq']],
@@ -138,6 +157,10 @@ def page(lang: str) -> str:
     shots = '\n'.join(
         f'      <figure><img src="{up}images/{n}.webp" alt="{e(c)}" width="1400" height="957" loading="lazy">'
         f'<figcaption>{e(c)}</figcaption></figure>' for n, c in t['shots'])
+    hints = {'linux': t['linux_hint'], 'macos': t['mac_hint'], 'windows': ''}
+    downloads = '\n'.join(
+        f'        <a class="dlbtn" href="{LATEST}{f}" target="_blank" rel="noopener"><b>⬇ {n}</b><span>{e(f)}</span>'
+        + (f'<small>{e(hints[k])}</small>' if hints[k] else '') + '</a>' for k, (n, f) in SETUP.items())
     faq = '\n'.join(f'      <details><summary>{e(q)}</summary><p>{e(a)}</p></details>' for q, a in t['faq'])
     return f'''<!doctype html>
 <html lang="{lang}">
@@ -200,6 +223,11 @@ def page(lang: str) -> str:
     details {{ background: var(--card); border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; }}
     summary {{ font-weight: 700; cursor: pointer; }}
     details p {{ margin: 8px 0 0; color: var(--muted); }}
+    .dl {{ display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }}
+    .dlbtn {{ display: flex; flex-direction: column; gap: 4px; background: var(--deep); color: #fff; text-decoration: none; padding: 16px 20px; border-radius: 12px; }}
+    .dlbtn b {{ font-size: 20px; }} .dlbtn span {{ color: #c4c8f0; font-size: 13px; word-break: break-all; }} .dlbtn small {{ color: #ffb877; font-size: 13px; }}
+    .dlbtn:hover {{ background: var(--brand); }}
+    .small {{ font-size: 14px; }}
     .again {{ text-align: center; margin: 40px 0 0; }}
     footer {{ margin-top: 56px; padding: 24px 0; color: var(--muted); font-size: 14px; border-top: 1px solid #dfe1ea; }}
   </style>
@@ -218,8 +246,9 @@ def page(lang: str) -> str:
           <p class="tagline">{e(t['tagline'])}</p>
           <p class="lead">{e(t['lead'])}</p>
           <div class="cta">
-            <a class="btn primary" href="{REPO}" target="_blank" rel="noopener">{e(t['source'])}</a>
+            <a class="btn primary" href="#download">⬇ {e(t['download'])}</a>
             <a class="btn ghost" href="{up}play/">▶ {e(t['preview'])}</a>
+            <a class="btn ghost" href="{REPO}" target="_blank" rel="noopener">{e(t['source'])}</a>
           </div>
           <p class="note">{e(t['preview_note'])}</p>
         </div>
@@ -228,6 +257,14 @@ def page(lang: str) -> str:
     </div>
   </header>
   <main class="wrap">
+    <section id="download">
+      <h2>{e(t['downloads_h'])}</h2>
+      <p>{e(t['downloads_note'])}</p>
+      <div class="dl">
+{downloads}
+      </div>
+      <p class="small"><a href="{REPO}/releases" target="_blank" rel="noopener">{e(t['other'])}</a></p>
+    </section>
     <section>
       <h2>{e(t['features_h'])}</h2>
       <ul class="features">
@@ -254,7 +291,7 @@ bin/jumphp run jumphpsql</code></pre>
     <section>
       <h2>{e(t['faq_h'])}</h2>
 {faq}
-      <p class="again"><a class="btn primary" href="{REPO}" target="_blank" rel="noopener">{e(t['source'])}</a></p>
+      <p class="again"><a class="btn primary" href="#download">⬇ {e(t['download'])}</a></p>
     </section>
   </main>
   <footer><div class="wrap">{e(t['footer'])} · <a href="{REPO}" target="_blank" rel="noopener">GitHub</a> · <a href="{up}play/">{e(t['preview'])}</a></div></footer>
